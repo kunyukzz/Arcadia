@@ -20,4 +20,4 @@ jobs:
         cl /nologo /W3 /D_CRT_SECURE_NO_WARNINGS logger.c /Fe:rcadia.exe
 
     - name: Run rcadia.exe
-      run: .\logger.exe:windows
+      run: .\bin\rcadia.exe
