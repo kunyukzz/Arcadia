@@ -48,7 +48,7 @@ void console_write(const char *msg, uint8_t color) {
 		ORANGE, 	// ERROR
 		YELLOW, 	// WARNING
 		WHITE, 		// INFO
-		CYAN, 		// DEBUG
+		CYAN 		// DEBUG
 	};
 
 	SetConsoleTextAttribute(console_handle, types[color]);
@@ -81,7 +81,7 @@ void console_write_error(const char *msg, uint8_t color) {
 		ORANGE, 	// ERROR
 		YELLOW, 	// WARNING
 		WHITE, 		// INFO
-		CYAN, 		// DEBUG
+		CYAN 		// DEBUG
 	};
 
 	SetConsoleTextAttribute(console_handle, types[color]);
@@ -110,7 +110,7 @@ void log_output(log_type_t type, const char *message, ...) {
 	char buffer[LENGTH];
 	memset(buffer, 0, sizeof(buffer));
 
-	__builtin_va_list p_arg;
+	va_list p_arg;
 	va_start(p_arg, message);
 	vsprintf(buffer, message, p_arg);
 	va_end(p_arg);
