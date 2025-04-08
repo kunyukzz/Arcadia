@@ -56,6 +56,7 @@ void console_write(const char *msg, uint8_t color) {
 	uint64_t length = strlen(msg);
 	LPDWORD num_written = 0;
 	WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), msg, (DWORD)length, num_written, 0);
+	fflush(stdout);
 #endif
 }
 
@@ -88,6 +89,7 @@ void console_write_error(const char *msg, uint8_t color) {
 	uint64_t length = strlen(msg);
 	LPDWORD num_written = 0;
 	WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), msg, (DWORD)length, num_written, 0);
+	fflush(stdout);
 #endif
 }
 
