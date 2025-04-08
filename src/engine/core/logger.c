@@ -42,7 +42,6 @@ void console_write(const char *msg, uint8_t color) {
 #elif OS_WINDOWS
 	HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
 
-    // ERROR, WARNING, INFO, DEBUG
 	static uint8_t types[5] = {
 		RED, 		// FATAL
 		ORANGE, 	// ERROR
@@ -75,8 +74,7 @@ void console_write_error(const char *msg, uint8_t color) {
 #elif OS_WINDOWS
 	HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
 
-    // ERROR, WARNING, INFO, DEBUG
-	static uint8_t types[4] = {
+	static uint8_t types[5] = {
 		RED, 		// FATAL
 		ORANGE, 	// ERROR
 		YELLOW, 	// WARNING
