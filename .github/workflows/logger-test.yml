@@ -15,9 +15,17 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Compile main.c
+    - name: Create bin directory
+      run: mkdir bin
+
+    - name: Compile source files
       run: |
-        cl /nologo /W3 /D_CRT_SECURE_NO_WARNINGS main.c /Fe:rcadia.exe
+        cl /nologo /W3 /D_CRT_SECURE_NO_WARNINGS ^
+          src\main.c ^
+          src\engine\core\logger.c ^
+          /I src ^
+          /Fe:bin\rcadia.exe
 
     - name: Run rcadia.exe
       run: .\bin\rcadia.exe
+
