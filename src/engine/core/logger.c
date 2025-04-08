@@ -1,6 +1,8 @@
 #include "logger.h"
 #include "assertion.h"
 
+#include "define.h"
+
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
