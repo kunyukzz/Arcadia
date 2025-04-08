@@ -19,9 +19,11 @@ jobs:
       uses: ilammy/msvc-dev-cmd@v1
 
     - name: Create bin directory
+      shell: cmd
       run: mkdir bin
 
     - name: Compile source files
+      shell: cmd
       run: |
         cl /nologo /W3 /D_CRT_SECURE_NO_WARNINGS ^
           src\main.c ^
@@ -30,5 +32,6 @@ jobs:
           /Fe:bin\rcadia.exe
 
     - name: Run rcadia.exe
+      shell: cmd
       run: .\bin\rcadia.exe
 
