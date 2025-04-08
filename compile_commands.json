@@ -1,0 +1,56 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-g",
+      "-std=c99",
+      "-I",
+      "src",
+      "-Wall",
+      "-Wextra",
+      "-pedantic",
+      "-Wno-c23-extensions",
+      "-Wshadow",
+      "-Wpointer-arith",
+      "-Wcast-align",
+      "-Wsign-conversion",
+      "-Wno-error=uninitialized",
+      "-fsanitize=address",
+      "-fno-omit-frame-pointer",
+      "-c",
+      "-o",
+      "obj/main.o",
+      "src/main.c"
+    ],
+    "directory": "/home/kunyukz/dev/Arcadia",
+    "file": "/home/kunyukz/dev/Arcadia/src/main.c",
+    "output": "/home/kunyukz/dev/Arcadia/obj/main.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-g",
+      "-std=c99",
+      "-I",
+      "src",
+      "-Wall",
+      "-Wextra",
+      "-pedantic",
+      "-Wno-c23-extensions",
+      "-Wshadow",
+      "-Wpointer-arith",
+      "-Wcast-align",
+      "-Wsign-conversion",
+      "-Wno-error=uninitialized",
+      "-fsanitize=address",
+      "-fno-omit-frame-pointer",
+      "-c",
+      "-o",
+      "obj/engine/core/logger.o",
+      "src/engine/core/logger.c"
+    ],
+    "directory": "/home/kunyukz/dev/Arcadia",
+    "file": "/home/kunyukz/dev/Arcadia/src/engine/core/logger.c",
+    "output": "/home/kunyukz/dev/Arcadia/obj/engine/core/logger.o"
+  }
+]

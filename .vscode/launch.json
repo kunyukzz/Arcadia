@@ -1,0 +1,25 @@
+{
+    "version": "1.0.0",
+    "configurations": [
+        {
+            "name": "(Linux) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/rcadia",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/bin/",
+            "environment": [],
+        },
+        {
+            "name": "(Windows) Launch",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bin/rcadia.exe",
+            "args": [],
+            "stopOnEntry": false,
+            "cwd": "${workspaceFolder}/bin/",
+            "console": "newExternalWindow",
+        },
+    ]
+}

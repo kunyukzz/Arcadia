@@ -1,0 +1,39 @@
+{
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "Build",
+            "windows": {
+                "command": "${workspaceFolder}/build.bat"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/build.sh"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "type": "shell",
+            "label": "Clean Everything",
+            "windows": {
+                "command": "${workspaceFolder}\\clean-all.bat"
+            },
+            "linux": {
+                "command": "${workspaceFolder}/clean-all.sh"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build"
+        },
+    ],
+    "version": "1.0.0"
+}

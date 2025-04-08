@@ -1,0 +1,23 @@
+name: Windows Logger Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:  # Allows manual run
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Compile logger.c
+      run: |
+        cl /nologo /W3 /D_CRT_SECURE_NO_WARNINGS logger.c /Fe:logger.exe
+
+    - name: Run logger.exe
+      run: .\logger.exe:windows
