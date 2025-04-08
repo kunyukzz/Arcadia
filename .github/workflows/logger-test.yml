@@ -17,7 +17,7 @@ jobs:
 
     - name: Compile main.c
       run: |
-        cl /nologo /W3 /D_CRT_SECURE_NO_WARNINGS logger.c /Fe:rcadia.exe
+        cl /nologo /W3 /D_CRT_SECURE_NO_WARNINGS main.c /Fe:rcadia.exe
 
     - name: Run rcadia.exe
       run: .\bin\rcadia.exe
