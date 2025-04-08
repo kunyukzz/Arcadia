@@ -12,6 +12,7 @@ typedef _Bool b8;
 	#define OS_LINUX 1
 #elif defined(_WIN32) || defined(WIN32) || defined(__WIN32__)
 	#define OS_WINDOWS 1
+	#include <windows.h>
 #endif
 
 #endif //__DEFINE_H__

@@ -9,7 +9,7 @@ int main(void) {
 	ar_INFO("Test Message: %f", 3.14f);
 	ar_DEBUG("Test Message: %f", 3.14f);
 
-	ar_assert(false);
+	//ar_assert(false);
 
 	return 0;
 }
