@@ -1,6 +1,7 @@
 CC = clang
-CFLAGS = -g -std=c99 -I src -Wall -Wextra -pedantic -Wno-c23-extensions -Wshadow -Wpointer-arith -Wcast-align -Wsign-conversion -Wno-error=uninitialized -fsanitize=address -fno-omit-frame-pointer
-#-fsanitize=address -fno-omit-frame-pointer
+CFLAGS = -g -std=c99 -I src -Wall -Wextra -pedantic -Wno-c23-extensions \
+		 -Wshadow -Wpointer-arith -Wcast-align -Wsign-conversion 		\
+		 -Wno-error=uninitialized -fsanitize=address -fno-omit-frame-pointer
 SRC = $(shell find src -name '*.c')
 OBJ_DIR = obj
 OBJ = $(patsubst src/%.c, $(OBJ_DIR)/%.o, $(SRC))

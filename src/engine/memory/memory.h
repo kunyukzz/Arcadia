@@ -1,0 +1,34 @@
+#ifndef __MEMORY_H__
+#define __MEMORY_H__
+
+#include "define.h"
+
+typedef enum mem_tag_t {
+    MEMTAG_UNKNOWN = 0x00,
+	MEMTAG_ARENA,
+    MEMTAG_ARRAY,
+    MEMTAG_LINEAR_ALLOCATOR,
+    MEMTAG_DYN_ARRAY,
+    MEMTAG_STRING,
+    MEMTAG_APPLICATION,
+    MEMTAG_RENDERER,
+    MEMTAG_GAME,
+    MEMTAG_TRANSFORM,
+    MEMTAG_ENTITY,
+    MEMTAG_ENTITY_NODE,
+    MEMTAG_SCENE,
+    MEMTAG_MAX_TAGS,
+} mem_tag_t;
+
+void memory_init(uint64_t *required, void *state);
+void memory_shut(void *state);
+
+void *memory_alloc(uint64_t size, mem_tag_t tag);
+void memory_free(void *block, uint64_t size, mem_tag_t tag);
+
+void *memory_zero(void *block, uint64_t size);
+void *memory_copy(void *target, const void *source, uint64_t size);
+void *memory_set(void *target, int32_t value, uint64_t size);
+
+void *memory_debug_stats(void *state);
+#endif //__MEMORY_H__

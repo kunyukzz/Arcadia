@@ -19,12 +19,12 @@
 	#define MAGENTA 	"38;5;219"
 #elif OS_WINDOWS
 	#define WHITE 		0x0F
-    #define RED 		0x0C
+	#define RED 		0x0C
 	#define ORANGE 		0x06
-    #define YELLOW 		0x0E
+	#define YELLOW 		0x0E
 	#define GREE 		0x0A
-    #define CYAN    	0x0B
-    #define MAGENTA 	0x0D
+	#define CYAN    	0x0B
+	#define MAGENTA 	0x0D
 #endif
 
 void console_write(const char *msg, uint8_t color) {
@@ -55,8 +55,8 @@ void console_write(const char *msg, uint8_t color) {
 	OutputDebugStringA(msg);
 	uint64_t length = strlen(msg);
 	LPDWORD num_written = 0;
-	WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), msg, (DWORD)length, num_written, 0);
-	fflush(stdout);
+	WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), msg, (DWORD)length,
+				  num_written, 0);
 #endif
 }
 
@@ -88,13 +88,16 @@ void console_write_error(const char *msg, uint8_t color) {
 	OutputDebugStringA(msg);
 	uint64_t length = strlen(msg);
 	LPDWORD num_written = 0;
-	WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), msg, (DWORD)length, num_written, 0);
-	fflush(stdout);
+	WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), msg, (DWORD)length,
+				  num_written, 0);
 #endif
 }
 
-void report(const char *expr, const char *message, const char *file, int32_t line) {
-	log_output(LOG_TYPE_FATAL, "ASSERT FAILURE: %s, Message: '%s', on file: %s, line: %d\n", expr, message, file, line);
+void report(const char *expr, const char *message,
+			const char *file, int32_t line) {
+	log_output(LOG_TYPE_FATAL, 
+			"ASSERT FAILURE: %s, Message: '%s', on file: %s, line: %d\n",
+			expr, message, file, line);
 }
 
 void log_output(log_type_t type, const char *message, ...) {
@@ -116,7 +119,7 @@ void log_output(log_type_t type, const char *message, ...) {
 	va_end(p_arg);
 
 	char final[LENGTH];
-	sprintf(final, "%s%s\n", type_string[type], buffer);
+	snprintf(final, LENGTH, "%s%s\n", type_string[type], buffer);
 
 	if (is_error) {
 		console_write_error(final, type);
