@@ -5,9 +5,9 @@
 
 typedef enum mem_tag_t {
     MEMTAG_UNKNOWN = 0x00,
-	MEMTAG_ARENA,
+	MEMTAG_ARENA_ALLOCATOR,
+	MEMTAG_STACK_ALLOCATOR,
     MEMTAG_ARRAY,
-    MEMTAG_LINEAR_ALLOCATOR,
     MEMTAG_DYN_ARRAY,
     MEMTAG_STRING,
     MEMTAG_APPLICATION,
@@ -20,10 +20,12 @@ typedef enum mem_tag_t {
     MEMTAG_MAX_TAGS,
 } mem_tag_t;
 
+#define memory_alloc(size, tag) memory_alloc_debug(size, tag, __FILE__, __LINE__, __func__)
+
 void memory_init(uint64_t *required, void *state);
 void memory_shut(void *state);
 
-void *memory_alloc(uint64_t size, mem_tag_t tag);
+void *memory_alloc_debug(uint64_t size, mem_tag_t tag, const char *file, int line, const char *func);
 void memory_free(void *block, uint64_t size, mem_tag_t tag);
 
 void *memory_zero(void *block, uint64_t size);

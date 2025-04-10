@@ -7,9 +7,9 @@
 
 static const char *memtag_string[MEMTAG_MAX_TAGS] = {
     "MEMTAG_UNKNOWN",
-	"MEMTAG_ARENA",
+	"MEMTAG_ARENA_ALLOCATOR",
+	"MEMTAG_STACK_ALLOCATOR",
     "MEMTAG_ARRAY",
-    "MEMTAG_LINEAR_ALLOCATOR",
     "MEMTAG_DYN_ARRAY",
     "MEMTAG_STRING",
     "MEMTAG_APPLICATION",
@@ -43,9 +43,9 @@ void memory_shut(void *state) {
 	pmemory_state = 0;
 }
 
-void *memory_alloc(uint64_t size, mem_tag_t tag) {
+void *memory_alloc_debug(uint64_t size, mem_tag_t tag, const char *file, int line, const char *func) {
 	if (tag == MEMTAG_UNKNOWN)
-		ar_WARNING("Memory Allocation called using unknown, reclass this allocation!");
+		ar_WARNING("Memory allocation with MEMTAG_UNKNOWN at %s:%d (%s)", file, line, func);
 	
 	if (pmemory_state) {
 		pmemory_state->status.total_allocated += size;
@@ -55,7 +55,7 @@ void *memory_alloc(uint64_t size, mem_tag_t tag) {
 	}
 	
 	void *block = malloc(size);
-	memset(block, 0, size);
+	memory_set(block, 0, size);
 
 	return block;
 }
@@ -70,10 +70,16 @@ void memory_free(void *block, uint64_t size, mem_tag_t tag) {
 }
 
 void *memory_zero(void *block, uint64_t size) {
-
+	return memset(block, 0, size);
 }
-void *memory_copy(void *target, const void *source, uint64_t size) {}
-void *memory_set(void *target, int32_t value, uint64_t size) {}
+
+void *memory_copy(void *target, const void *source, uint64_t size) {
+	return memcpy(target, source, size);
+}
+
+void *memory_set(void *target, int32_t value, uint64_t size) {
+	return memset(target, value, size);
+}
 
 void *memory_debug_stats(void *state) {
 	const uint64_t Gib = 1024 * 1024 * 1024;
