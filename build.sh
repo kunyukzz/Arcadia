@@ -2,7 +2,6 @@
 
 set echo on
 
-echo "Clean project...."
 make clean
 
 echo "Building project..."

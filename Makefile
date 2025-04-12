@@ -1,6 +1,6 @@
 CC = clang
-CFLAGS = -g -std=c99 -I src -Wall -Wextra -pedantic -Wno-c23-extensions \
-		 -Wshadow -Wpointer-arith -Wcast-align -Wsign-conversion 		\
+CFLAGS = -g -std=c99 -I src -Wall -Wextra -Wno-c23-extensions 				\
+		 -Wshadow -Wpointer-arith -Wcast-align -Wsign-conversion 			\
 		 -Wno-error=uninitialized -fsanitize=address -fno-omit-frame-pointer
 SRC = $(shell find src -name '*.c')
 OBJ_DIR = obj
@@ -26,15 +26,17 @@ all: $(OUT)
 
 $(OUT): $(OBJ)
 	@mkdir -p bin
-	$(CC) $(OBJ) -o $(OUT) $(LDFLAGS)
+	@$(CC) $(OBJ) -o $(OUT) $(LDFLAGS)
 
 $(OBJ_DIR)/%.o: src/%.c | create_dir
-	$(CC) $(CFLAGS) -c $< -o $@
+	@echo "Compiling $<"
+	@$(CC) $(CFLAGS) -c $< -o $@
 
 create_dir:
 	@mkdir -p $(DIR)
 
 clean:
-	rm -f $(shell find -name '*.o') $(OBJ) $(OUT)
+	@echo "Clean projects artifacts...$<"
+	@rm -f $(shell find -name '*.o') $(OBJ) $(OUT)
 
 .PHONY: all clean
