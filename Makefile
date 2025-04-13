@@ -2,6 +2,7 @@ CC = clang
 CFLAGS = -g -std=c99 -I src -Wall -Wextra -Wno-c23-extensions 				\
 		 -Wshadow -Wpointer-arith -Wcast-align -Wsign-conversion 			\
 		 -Wno-error=uninitialized -fsanitize=address -fno-omit-frame-pointer
+INCLUDE = -I$(VULKAN_SDK)/include
 SRC = $(shell find src -name '*.c')
 OBJ_DIR = obj
 OBJ = $(patsubst src/%.c, $(OBJ_DIR)/%.o, $(SRC))
@@ -11,7 +12,7 @@ OUT = bin/rcadia
 OS := $(shell uname)
 
 # Default: Linux settings
-LDFLAGS = -lasan -lxcb -lX11 -lrt
+LDFLAGS = -lasan -lvulkan -lxcb -lX11 -lX11-xcb -lrt -L$(VULKAN_SDK)/lib
 
 # Windows settings (Modify if using MinGW or MSVC)
 ifeq ($(OS), Windows_NT)
@@ -30,7 +31,7 @@ $(OUT): $(OBJ)
 
 $(OBJ_DIR)/%.o: src/%.c | create_dir
 	@echo "Compiling $<"
-	@$(CC) $(CFLAGS) -c $< -o $@
+	@$(CC) $(CFLAGS) -c $(INCLUDE) $< -o $@
 
 create_dir:
 	@mkdir -p $(DIR)

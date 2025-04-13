@@ -12,7 +12,7 @@ typedef struct event_entry_t {
 	register_event_t *events;
 } event_entry_t;
 
-#define MAX_MSG_CODE 1024
+#define MAX_MSG_CODE 8124
 
 typedef struct event_state_t {
 	event_entry_t registered[MAX_MSG_CODE];
@@ -37,6 +37,7 @@ void event_shut(void *state) {
 	if (p_state) {
 		for (uint16_t i = 0; i < MAX_EVENT_CODE; ++i) {
 			if (p_state->registered[i].events != 0) {
+				dyn_array_destroy(p_state->registered[i].events);
 				p_state->registered[i].events = 0;
 			}
 		}
