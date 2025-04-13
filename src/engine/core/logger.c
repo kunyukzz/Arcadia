@@ -1,10 +1,11 @@
-#include "logger.h"
-#include "assertion.h"
+#include "engine/core/logger.h"
+#include "engine/core/assertion.h"
+#include "engine/core/strings.h"
 
-#include "define.h"
+#include "engine/platform/filesystem.h"
+#include "engine/memory/memory.h"
 
 #include <stdarg.h>
-#include <string.h>
 #include <stdio.h>
 
 #define LENGTH 32000
@@ -26,6 +27,13 @@
 	#define CYAN    	0x0B
 	#define MAGENTA 	0x0D
 #endif
+
+typedef struct log_state_t {
+	file_handle_t log_handle;
+} log_state_t;
+
+static log_state_t *p_state;
+
 
 void console_write(const char *msg, uint8_t color) {
 #if OS_LINUX
@@ -93,11 +101,43 @@ void console_write_error(const char *msg, uint8_t color) {
 #endif
 }
 
+void append_to_log_file(const char *message) {
+	if (p_state && p_state->log_handle.is_valid) {
+		uint64_t length = string_length(message);
+		uint64_t written = 0;
+
+		if (!filesystem_write(&p_state->log_handle, length, message, &written))
+			console_write_error("ERROR: writing console.log", LOG_TYPE_ERROR);
+	}
+}
+
 void report(const char *expr, const char *message,
 			const char *file, int32_t line) {
 	log_output(LOG_TYPE_FATAL, 
 			"ASSERT FAILURE: %s, Message: '%s', on file: %s, line: %d\n",
 			expr, message, file, line);
+}
+
+b8 log_init(uint64_t *memory_require, void *state) {
+	*memory_require = sizeof(log_state_t);
+	if (state == 0)
+		return true;
+
+	p_state = state;
+
+	if (!filesystem_open("console.log", MODE_WRITE, false,
+						 &p_state->log_handle)) {
+	  console_write_error("ERROR: unable to open console.log for writing.",
+						  LOG_TYPE_ERROR);
+	  return false;
+	}
+
+	return true;
+}
+
+void log_shut(void *state) {
+	(void)state;
+	p_state = 0;
 }
 
 void log_output(log_type_t type, const char *message, ...) {
@@ -111,19 +151,21 @@ void log_output(log_type_t type, const char *message, ...) {
 	b8 is_error = type < LOG_TYPE_ERROR;
 
 	char buffer[LENGTH];
-	memset(buffer, 0, sizeof(buffer));
+	memory_zero(buffer, sizeof(buffer));
 
 	va_list p_arg;
 	va_start(p_arg, message);
 	vsprintf(buffer, message, p_arg);
 	va_end(p_arg);
 
-	char final[LENGTH];
-	snprintf(final, LENGTH, "%s%s\n", type_string[type], buffer);
+	string_format(buffer, "%s%s\n", type_string[type],buffer);
 
 	if (is_error) {
-		console_write_error(final, type);
+		console_write_error(buffer, type);
 	} else {
-		console_write(final, type);
+		console_write(buffer, type);
 	}
+
+	// save file to computer
+	append_to_log_file(buffer);
 }

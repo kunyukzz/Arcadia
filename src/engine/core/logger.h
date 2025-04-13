@@ -1,7 +1,7 @@
 #ifndef __LOGGER_H__
 #define __LOGGER_H__
 
-#include "define.h"
+#include "engine/define.h"
 
 typedef enum {
 	LOG_TYPE_FATAL,
@@ -10,6 +10,9 @@ typedef enum {
 	LOG_TYPE_INFO,
 	LOG_TYPE_DEBUG
 } log_type_t;
+
+b8 log_init(uint64_t *memory_require, void *state);
+void log_shut(void *state);
 
 void log_output(log_type_t type, const char *message, ...);
 

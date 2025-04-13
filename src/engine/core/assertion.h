@@ -1,7 +1,7 @@
 #ifndef __ASSERTION_H__
 #define __ASSERTION_H__
 
-#include "define.h"
+#include "engine/define.h"
 
 #define debug_break() __builtin_trap()
 
