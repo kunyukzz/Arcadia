@@ -1,9 +1,8 @@
-#include "memory.h"
+#include "engine/memory/memory.h"
 #include "engine/core/logger.h"
+#include "engine/core/strings.h"
 
-#include <string.h>
 #include <stdlib.h>
-#include <stdio.h>
 
 static const char *memtag_string[MEMTAG_MAX_TAGS] = {
     "MEMTAG_UNKNOWN",
@@ -32,38 +31,49 @@ typedef struct memory_state_t {
 	uint64_t alloc_count;
 } memory_state_t;
 
-static memory_state_t *pmemory_state;
+static memory_state_t *p_state;
 
 void memory_init(uint64_t *required, void *state) {
 	*required = sizeof(memory_state_t);
-	pmemory_state = (memory_state_t *)state;
+	if (state == 0)
+		return;
+
+	p_state = state;
+	p_state->alloc_count = 0;
+	memory_zero(&p_state->status, sizeof(p_state->status));
+
+	ar_INFO("Memory System Initialized");
 }
 
 void memory_shut(void *state) {
-	pmemory_state = 0;
+	(void)state;
+	p_state = 0;
 }
 
-void *memory_alloc_debug(uint64_t size, mem_tag_t tag, const char *file, int line, const char *func) {
-	if (tag == MEMTAG_UNKNOWN)
-		ar_WARNING("Memory allocation with MEMTAG_UNKNOWN at %s:%d (%s)", file, line, func);
-	
-	if (pmemory_state) {
-		pmemory_state->status.total_allocated += size;
-		pmemory_state->status.tagged_allocation[tag] += size;
-		pmemory_state->status.tagged_alloc_count[tag]++;
-		pmemory_state->alloc_count++;
-	}
-	
-	void *block = malloc(size);
-	memory_set(block, 0, size);
+void *memory_alloc_debug(uint64_t size, mem_tag_t tag, const char *file,
+                         int line, const char *func) {
+  if (tag == MEMTAG_UNKNOWN)
+    ar_WARNING("Memory allocation with MEMTAG_UNKNOWN at %s:%d (%s)", file,
+               line, func);
 
-	return block;
+  if (p_state) {
+    p_state->status.total_allocated += size;
+    p_state->status.tagged_allocation[tag] += size;
+    p_state->status.tagged_alloc_count[tag]++;
+    p_state->alloc_count++;
+  }
+
+  void *block = malloc(size);
+  memory_set(block, 0, size);
+
+  return block;
 }
 
 void memory_free(void *block, uint64_t size, mem_tag_t tag) {
-	if (pmemory_state) {
-		pmemory_state->status.total_allocated -= size;
-		pmemory_state->status.tagged_allocation[tag] -= size;
+	if (p_state) {
+		p_state->status.total_allocated -= size;
+		p_state->status.tagged_allocation[tag] -= size;
+		p_state->status.tagged_alloc_count[tag]--;
 	}
 
 	free(block);
@@ -81,45 +91,61 @@ void *memory_set(void *target, int32_t value, uint64_t size) {
 	return memset(target, value, size);
 }
 
-void *memory_debug_stats(void *state) {
+char *memory_debug_stats(void) {
 	const uint64_t Gib = 1024 * 1024 * 1024;
 	const uint64_t Mib = 1024 * 1024;
 	const uint64_t Kib = 1024;
 
-	static char buffer[8000] = "System Memory Used:\n";
-	uint64_t offset = strlen(buffer);
+	char buffer[8000] = "System Memory Used:\n";
+//	uint64_t offset = strlen(buffer);
+	uint64_t offset = string_length(buffer);
 
 	for (uint32_t i = 0; i < MEMTAG_MAX_TAGS; ++i) {
 		char unit[4] = "Xib";
 		uint32_t count = 0;
 		float amount = 1.0f;
 
-		if (pmemory_state->status.tagged_allocation[i] >= Gib) {
+		if (p_state->status.tagged_allocation[i] >= Gib) {
 			unit[0] = 'G';
-			amount = pmemory_state->status.tagged_allocation[i] / (float)Gib;
-		} else if (pmemory_state->status.tagged_allocation[i] >= Mib) {
+			amount = p_state->status.tagged_allocation[i] / (float)Gib;
+		} else if (p_state->status.tagged_allocation[i] >= Mib) {
 			unit[0] = 'M';
-			amount = pmemory_state->status.tagged_allocation[i] / (float)Mib;
-		} else if (pmemory_state->status.tagged_allocation[i] >= Kib) {
+			amount = p_state->status.tagged_allocation[i] / (float)Mib;
+		} else if (p_state->status.tagged_allocation[i] >= Kib) {
 			unit[0] = 'K';
-			amount = pmemory_state->status.tagged_allocation[i] / (float)Kib;
+			amount = p_state->status.tagged_allocation[i] / (float)Kib;
 		} else {
 			unit[0] = 'B';
-			amount = pmemory_state->status.tagged_allocation[i];
+			amount = p_state->status.tagged_allocation[i];
 		}
-		count = pmemory_state->status.tagged_alloc_count[i];
+		count = p_state->status.tagged_alloc_count[i];
+
 #if OS_LINUX
-		int32_t length = snprintf(buffer + offset, 8000, "--> %s: [\x1b[33m%u\x1b[0m] \x1b[34m%.2f%s\x1b[0m\n",
-				memtag_string[i], count, amount, unit);
+
+		int32_t length = snprintf(buffer + offset, 8000,
+			"--> %s: [\x1b[33m%u\x1b[0m] \x1b[34m%.2f%s\x1b[0m\n",
+			memtag_string[i], count, amount, unit);
+
 #elif OS_WINDOWS
+		
 		int32_t length = snprintf(buffer + offset, 8000, "--> %s: [%u] %.2f%s\n",
 				memtag_string[i], count, amount, unit);
+
 #endif
+
 		offset += (uint32_t)length;
 
 		if (offset >= sizeof(buffer))
 			break;
 	}
+	
+	char *out = string_duplicate(buffer);
+	return out;
+}
 
-	return buffer;
+uint64_t get_mem_alloc_count(void) {
+    if (p_state)
+        return p_state->alloc_count;
+
+    return 0;
 }
