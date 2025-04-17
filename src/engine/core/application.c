@@ -163,21 +163,19 @@ b8 application_init(struct game_entry *game_inst) {
 	event_reg(EVENT_CODE_KEY_RELEASE, 0, app_on_key);
 
 	/* set platform memory allocation */
-	platform_init(&p_state->platform.size, 0, 0, 0, 0, 0, 0);
+	platform_init(&p_state->platform.size, 0, 0, 0, 0);
 	p_state->platform.state =
 		arena_allocate(&p_state->arena, p_state->platform.size);
 	if (!platform_init(&p_state->platform.size, p_state->platform.state,
 					   game_inst->app_config.name,
-					   game_inst->app_config.pos_x,
-					   game_inst->app_config.pos_y,
 					   game_inst->app_config.width,
 					   game_inst->app_config.height)) return false;
 
 	/* set renderer memory allocation */
-	renderer_fe_init(&p_state->renderer.size, 0, 0);
+	renderer_init(&p_state->renderer.size, 0, 0);
 	p_state->renderer.state =
 		arena_allocate(&p_state->arena, p_state->renderer.size);
-	if (!renderer_fe_init(&p_state->renderer.size, p_state->renderer.state,
+	if (!renderer_init(&p_state->renderer.size, p_state->renderer.state,
 						  game_inst->app_config.name)) {
 	  ar_FATAL("Renderer failed to initialize");
 	  return false;
@@ -265,7 +263,7 @@ b8 application_run(void) {
 	event_unreg(EVENT_CODE_KEY_RELEASE, 0, app_on_key);
 
 	input_shut(p_state->input.state);
-	renderer_fe_shut(p_state->renderer.state);
+	renderer_shut(p_state->renderer.state);
 	platform_shut(p_state->platform.state);
 	log_shut(p_state->log.state);
 	memory_shut(p_state->memory.state);
