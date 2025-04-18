@@ -2,3 +2,7 @@ bin/
 obj/
 .cache/
 err.txt
+console.log
+Arcadia_Engine.srctrlbm
+Arcadia_Engine.srctrldb
+Arcadia_Engine.srctrlprj
