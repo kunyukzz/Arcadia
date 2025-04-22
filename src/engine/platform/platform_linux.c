@@ -217,7 +217,7 @@ b8 platform_create_vulkan_surface(struct vulkan_context_t *context) {
 
 	/* this it to hold surface inside context to pass into p_state. not
 	 * neccessarily needed this unless want it. */
-	p_state->surface = context->surface;
+	//p_state->surface = context->surface;
 	//context->surface = p_state->surface;
 	return true;
 }

@@ -8,7 +8,7 @@ MEMORYS = -fsanitize=address -fno-omit-frame-pointer
 BUILD ?= debug
 
 ifeq ($(BUILD), debug)
-	CFLAGS = -D_DEBUG -g -D_POSIX_C_SOURCE=199309L $(STD) $(INCLUDES) 			\
+	CFLAGS = -D_DEBUG -g -D_POSIX_C_SOURCE=200809L $(STD) $(INCLUDES) 			\
 			 $(WARNINGS) $(MEMORYS)
 	LDFLAGS = -lasan -lvulkan -lxcb -lX11 -lX11-xcb -lrt -L$(VULKAN_SDK)/lib
 	OUT_DIR = bin/debug
