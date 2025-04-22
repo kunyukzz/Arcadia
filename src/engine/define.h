@@ -14,5 +14,7 @@
 
 typedef _Bool b8;
 
+#define ar_CLAMP(value, min, max)                                              \
+  (value <= min) ? min : (value >= max) ? max : value
 
 #endif //__DEFINE_H__

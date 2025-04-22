@@ -1,18 +1,19 @@
 #include "dummy/game.h"
 
-#include "engine/core/logger.h"
+//#include "engine/core/logger.h"
 #include "engine/memory/memory.h"
 
 b8 game_init(game_entry *game_inst) {
-	(void)game_inst;
-	ar_DEBUG("game_init() called");
+	game_state_t *p_state = (game_state_t *)game_inst->state;
+	(void)p_state;
 
 	return true;
 }
 
 b8 game_run(game_entry *game_inst, float delta_time) {
-	(void)game_inst;
 	(void)delta_time;
+	game_state_t *p_state = (game_state_t *)game_inst->state;
+	(void)p_state;
 
 	return true;
 }

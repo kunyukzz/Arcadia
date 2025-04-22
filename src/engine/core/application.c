@@ -43,8 +43,9 @@ typedef struct application_state_t {
 static application_state_t *p_state;
 
 
-/* 			 this is part of internal event handling for engine 		  */
-/* ###################################################################### */
+/* 				 this is part of internal event handling for engine 		  */
+/* ========================= PRIVATE FUNCTION =============================== */
+/* ========================================================================== */
 
 b8 app_on_event(uint16_t code, void *sender, void *listener, event_context_t ec) {
 	(void)sender;
@@ -118,8 +119,8 @@ b8 app_on_resized(uint16_t code, void *sender, void *listener, event_context_t e
 	return false;
 }
 
-/* ###################################################################### */
-
+/* ========================================================================== */
+/* ========================================================================== */
 
 b8 application_init(struct game_entry *game_inst) {
 	if (game_inst->app_state) {
@@ -229,6 +230,10 @@ b8 application_run(void) {
 				p_state->is_running = false;
 				break;
 			}
+
+			render_packet_t packet;
+			packet.delta = delta;
+			renderer_draw_frame(&packet);
 
 			/* calculate how long frame took */
 			double frame_end_time = get_absolute_time();

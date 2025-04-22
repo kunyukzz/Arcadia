@@ -42,7 +42,8 @@ void console_write(const char *msg, uint8_t color) {
 		ORANGE, 	// ERROR
 		YELLOW, 	// WARNING
 		WHITE, 		// INFO
-		CYAN 		// DEBUG
+		CYAN, 		// DEBUG
+		MAGENTA 	// TRACE
 	};
 
     printf("\033[%sm%s\033[0m", color_string[color], msg);
@@ -50,12 +51,13 @@ void console_write(const char *msg, uint8_t color) {
 #elif OS_WINDOWS
 	HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
 
-	static uint8_t types[5] = {
+	static uint8_t types[6] = {
 		RED, 		// FATAL
 		ORANGE, 	// ERROR
 		YELLOW, 	// WARNING
 		WHITE, 		// INFO
-		CYAN 		// DEBUG
+		CYAN, 		// DEBUG
+		MAGENTA 	// TRACE
 	};
 
 	SetConsoleTextAttribute(console_handle, types[color]);
@@ -75,7 +77,8 @@ void console_write_error(const char *msg, uint8_t color) {
 		ORANGE, 	// ERROR
 		YELLOW, 	// WARNING
 		WHITE, 		// INFO
-		CYAN 		// DEBUG
+		CYAN, 		// DEBUG
+		MAGENTA 	// TRACE
 	};
 
     printf("\033[%sm%s\033[0m", color_string[color], msg);
@@ -83,12 +86,13 @@ void console_write_error(const char *msg, uint8_t color) {
 #elif OS_WINDOWS
 	HANDLE console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
 
-	static uint8_t types[5] = {
+	static uint8_t types[6] = {
 		RED, 		// FATAL
 		ORANGE, 	// ERROR
 		YELLOW, 	// WARNING
 		WHITE, 		// INFO
-		CYAN 		// DEBUG
+		CYAN, 		// DEBUG
+		MAGENTA 	// TRACE
 	};
 
 	SetConsoleTextAttribute(console_handle, types[color]);
@@ -141,12 +145,13 @@ void log_shut(void *state) {
 }
 
 void log_output(log_type_t type, const char *message, ...) {
-	const char *type_string[5] = {
+	const char *type_string[6] = {
 		"[FATAL]: ",
 		"[ERROR]: ",
 		"[WARNING]: ",
 		"[INFO]: ",
-		"[DEBUG]: "};
+		"[DEBUG]: ",
+		"[TRACE]: "};
 
 	b8 is_error = type < LOG_TYPE_ERROR;
 

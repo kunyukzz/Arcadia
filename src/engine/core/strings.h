@@ -49,5 +49,21 @@ static inline int32_t string_format(char *dest, const char *format, ...) {
 	return -1;
 }
 
+/*
+static inline const char *string_find(const char *haystack, const char *needle) {
+	while (*haystack) {
+		const char *h = haystack;
+		const char *n = needle;
+		while (*h && *n && (*h == *n)) {
+			++h;
+			++n;
+		}
+		if (!*n) return haystack;
+		++haystack;
+	}
+	return 0;
+}
+*/
+
 
 #endif //__STRINGS_H__

@@ -59,16 +59,17 @@ b8 platform_init(uint64_t *memory_require, void *state, const char *name,
 	uint32_t value_mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
 	uint32_t value_list[] = {p_state->screen->black_pixel, event_mask};
 
-	uint32_t screen_width = p_state->screen->width_in_pixels;
-	uint32_t screen_height = p_state->screen->height_in_pixels;
-	uint32_t x = (screen_width - w) / 2;
-	uint32_t y = (screen_height - h) / 2;
+	//uint32_t screen_width = p_state->screen->width_in_pixels;
+	//uint32_t screen_height = p_state->screen->height_in_pixels;
+	//uint32_t x = (screen_width - w) / 2;
+	//uint32_t y = (screen_height - h) / 2;
 
 	xcb_create_window(p_state->conn, XCB_COPY_FROM_PARENT, p_state->window,
-                    p_state->screen->root, x, y, w, h, 0,
+                    p_state->screen->root, 0, 0, w, h, 0,
                     XCB_WINDOW_CLASS_INPUT_OUTPUT, p_state->screen->root_visual,
                     value_mask, value_list);
 
+	/*
 	uint32_t values[] = {(uint32_t)x, (uint32_t)y};
 	xcb_configure_window(p_state->conn, p_state->window,
 			XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
@@ -79,6 +80,7 @@ b8 platform_init(uint64_t *memory_require, void *state, const char *name,
 	hints->y = (int)y;
 	XSetWMNormalHints(p_state->display, p_state->window, hints);
 	XFree(hints);
+	*/
 
 	xcb_change_property(p_state->conn, XCB_PROP_MODE_REPLACE, p_state->window,
                       XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, strlen(name), name);
@@ -206,7 +208,8 @@ b8 platform_create_vulkan_surface(struct vulkan_context_t *context) {
 	create_info.connection = p_state->conn;
 	create_info.window = p_state->window;
 
-	VkResult result = vkCreateXcbSurfaceKHR(context->instance, &create_info, context->alloc, &context->surface);
+	VkResult result = vkCreateXcbSurfaceKHR(context->instance, &create_info,
+											context->alloc, &context->surface);
 	if (result != VK_SUCCESS) {
 		ar_FATAL("Vulkan Surface failed to create");
 		return false;
@@ -214,7 +217,8 @@ b8 platform_create_vulkan_surface(struct vulkan_context_t *context) {
 
 	/* this it to hold surface inside context to pass into p_state. not
 	 * neccessarily needed this unless want it. */
-	//p_state->surface = context->surface;
+	p_state->surface = context->surface;
+	//context->surface = p_state->surface;
 	return true;
 }
 

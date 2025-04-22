@@ -1,14 +1,15 @@
 CC = clang
 STD = -std=c99
 INCLUDES = -I src -I$(VULKAN_SDK)/include
-WARNINGS = -Wall -Wextra -Wno-c23-extensions -Wshadow -Wpointer-arith -Wcast-align -Wsign-conversion 			\
-		   -Wno-error=uninitialized
+WARNINGS = -Wall -Wextra -Wno-c23-extensions -Wshadow -Wpointer-arith 			\
+		   -Wcast-align -Wsign-conversion -Wno-error=uninitialized
+MEMORYS = -fsanitize=address -fno-omit-frame-pointer
 
 BUILD ?= debug
 
 ifeq ($(BUILD), debug)
-	CFLAGS = -D_DEBUG -g -D_POSIX_C_SOURCE=199309L $(STD) $(INCLUDES) $(WARNINGS) -fsanitize=address  			\
-			 -fno-omit-frame-pointer
+	CFLAGS = -D_DEBUG -g -D_POSIX_C_SOURCE=199309L $(STD) $(INCLUDES) 			\
+			 $(WARNINGS) $(MEMORYS)
 	LDFLAGS = -lasan -lvulkan -lxcb -lX11 -lX11-xcb -lrt -L$(VULKAN_SDK)/lib
 	OUT_DIR = bin/debug
 	OBJ_DIR = obj/debug
