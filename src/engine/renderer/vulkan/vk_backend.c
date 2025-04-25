@@ -1,0 +1,454 @@
+#include "engine/renderer/vulkan/vk_backend.h"
+
+#include "engine/core/application.h"
+#include "engine/core/logger.h"
+
+#include "engine/renderer/vulkan/vk_type.h"
+#include "engine/renderer/vulkan/vk_debug.h"
+#include "engine/renderer/vulkan/vk_utils.h"
+#include "engine/renderer/vulkan/vk_platform.h"
+#include "engine/renderer/vulkan/vk_device.h"
+#include "engine/renderer/vulkan/vk_swapchain.h"
+#include "engine/renderer/vulkan/vk_renderpass.h"
+#include "engine/renderer/vulkan/vk_combuffer.h"
+#include "engine/renderer/vulkan/vk_framebuffer.h"
+#include "engine/renderer/vulkan/vk_fence.h"
+#include "engine/renderer/vulkan/vk_result.h"
+
+#include <vulkan/vulkan_core.h>
+
+// static vulkan context related
+static vulkan_context_t context;
+static uint32_t cache_framebuffer_width = 0;
+static uint32_t cache_framebuffer_height = 0;
+
+/* ========================= PRIVATE FUNCTION =============================== */
+/* ========================================================================== */
+
+int32_t find_mem_idx(uint32_t type_filter, uint32_t prop_flag) {
+	VkPhysicalDeviceMemoryProperties mem_prop;
+	vkGetPhysicalDeviceMemoryProperties(context.device.phys_dev, &mem_prop);
+
+	for (uint32_t i = 0; i < mem_prop.memoryTypeCount; ++i) {
+		if (type_filter & (1 << i) &&
+		   (mem_prop.memoryTypes[i].propertyFlags & prop_flag) == prop_flag)
+			return (int32_t)i;
+    }
+
+	ar_WARNING("Unable to find suitable memory type");
+	return -1;
+}
+
+void command_buffer_init(render_backend_t *be) {
+	(void)be;
+
+    if (!context.graphic_comm_buffer) {
+        context.graphic_comm_buffer =
+            dyn_array_reserved(vulkan_commandbuffer_t,
+                               context.swapchain.image_count);
+
+        for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
+            memory_zero(&context.graphic_comm_buffer[i],
+                        sizeof(vulkan_commandbuffer_t));
+        }
+    }
+
+    for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
+        if (context.graphic_comm_buffer[i].handle) {
+            vk_combuff_shut(&context, context.device.graphics_command_pool,
+                            &context.graphic_comm_buffer[i]);
+        }
+
+        memory_zero(&context.graphic_comm_buffer[i],
+                    sizeof(vulkan_commandbuffer_t));
+        vk_combuff_init(&context, context.device.graphics_command_pool,
+                        &context.graphic_comm_buffer[i]);
+    }
+
+    ar_DEBUG("Vulkan Commandbuffer Created");
+}
+
+void regen_framebuffer(render_backend_t *be, vulkan_swapchain_t *swapchain,
+                       vulkan_renderpass_t *renderpass) {
+	(void)be;
+	for (uint32_t i = 0; i < swapchain->image_count; ++i) {
+		uint32_t attach_count = 2;
+        VkImageView attach[]     = {swapchain->image_view[i],
+                                    swapchain->image_attach.image_view};
+
+        vk_framebuffer_init(&context, renderpass, swapchain->extents, attach,
+                            attach_count, &context.swapchain.framebuffer[i]);
+    }
+}
+
+b8 recreate_swapchain(render_backend_t *be) {
+	if (context.recreate_swap) {
+		ar_DEBUG("recreate_swapchain already creating");
+		return false;
+	}
+
+	if (context.framebuffer_w == 0 || context.framebuffer_h == 0) {
+		ar_DEBUG("recreate_swapchain called window < 1 in dimension. Booting...");
+		return false;
+	}
+	
+	context.recreate_swap = true;
+	vkDeviceWaitIdle(context.device.logic_dev);
+
+	vk_image_view_shut(&context, &context.swapchain);
+	vk_image_shut(&context, &context.swapchain.image_attach);
+	vk_swapchain_reinit(&context, &context.swapchain);
+	
+	context.framebuffer_w = cache_framebuffer_width;
+	context.framebuffer_h = cache_framebuffer_height;
+	context.main_render.extents.width = context.framebuffer_w;
+	context.main_render.extents.height = context.framebuffer_h;
+	cache_framebuffer_height = 0;
+	cache_framebuffer_width = 0;
+	context.framebuffer_last_gen = context.framebuffer_size_gen;
+
+    for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
+        vk_combuff_shut(&context, context.device.graphics_command_pool,
+                        &context.graphic_comm_buffer[i]);
+    }
+    for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
+        vk_framebuffer_shut(&context, &context.swapchain.framebuffer[i]);
+    }
+
+    context.main_render.extents.width = 0;
+	context.main_render.extents.height = 0;
+	context.main_render.extents.width = context.framebuffer_w;
+	context.main_render.extents.height = context.framebuffer_h;
+
+	regen_framebuffer(be, &context.swapchain, &context.main_render);
+	command_buffer_init(be);
+	context.recreate_swap = false;
+
+	return true;
+}
+
+/* ========================================================================== */
+/* ========================================================================== */
+
+b8 vk_backend_init(render_backend_t *backend, const char *name) {
+	context.find_mem_idx = find_mem_idx;
+	context.alloc = 0;
+
+	application_get_framebuffer_size(&cache_framebuffer_width,
+									 &cache_framebuffer_height);
+	context.framebuffer_w =
+		(cache_framebuffer_width != 0) ? cache_framebuffer_width : 1280;
+	context.framebuffer_h =
+		(cache_framebuffer_height != 0) ? cache_framebuffer_height : 720;
+	cache_framebuffer_width = 0;
+	cache_framebuffer_height = 0;
+
+
+	/* =========================== Setup Vulkan ============================= */
+	VkApplicationInfo app_info 	= {};
+	app_info.sType 				= VK_STRUCTURE_TYPE_APPLICATION_INFO;
+	app_info.apiVersion 		= VK_API_VERSION_1_0;
+	app_info.pApplicationName 	= name;
+	app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+	app_info.pEngineName 		= "My Engine";
+	app_info.engineVersion 		= VK_MAKE_VERSION(1, 0, 0);
+	
+	VkInstanceCreateInfo create_info = {};
+	create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+	create_info.pApplicationInfo = &app_info;
+
+	/* ======================= Extensions Vulkan ============================ */
+	uint32_t ext_count;
+	const char **extension = vk_req_get_extensions(&ext_count);
+
+	create_info.enabledExtensionCount = ext_count;
+	create_info.ppEnabledExtensionNames = extension;
+
+	/* ==================== Validation Layer Vulkan ========================= */
+	uint32_t layer_count;
+	const char **validation = vk_get_validation_layers(&layer_count);
+
+	create_info.enabledLayerCount = layer_count;
+	create_info.ppEnabledLayerNames = validation;
+
+	VK_CHECK(vkCreateInstance(&create_info, context.alloc, &context.instance));
+	ar_DEBUG("Vulkan Instance Created");
+
+	/* ======================== Vulkan Debugger ============================= */
+#if defined (_DEBUG)
+	vk_debug_init(&context);
+	ar_DEBUG("Vulkan Debug Messenger Created");
+#endif
+
+	/* ========================= Vulkan Surface ============================= */
+	ar_DEBUG("Vulkan Surface Created");
+	if (!platform_create_vulkan_surface(&context)) {
+		ar_ERROR("Failed to create platform surface");
+		return false;
+	}
+
+	/* ========================= Vulkan Device ============================== */
+	ar_DEBUG("Vulkan Device Created");
+	if (!vk_device_init(&context)) {
+		ar_ERROR("Failed to create vulkan device");
+		return false;
+	}
+
+	/* ======================== Vulkan Swapchain ============================= */
+	vk_swapchain_init(&context, &context.swapchain);
+
+	/* ======================= Vulkan Renderpass ============================= */
+	vk_renderpass_init(&context, &context.main_render);
+
+	/* ======================= Vulkan Framebuffer ============================ */
+    context.swapchain.framebuffer =
+        dyn_array_reserved(vulkan_framebuffer_t, context.swapchain.image_count);
+	regen_framebuffer(backend, &context.swapchain, &context.main_render);
+	
+    command_buffer_init(backend);
+	/* ======================== Vulkan Semaphore ============================= */
+    context.avail_semaphore =
+        dyn_array_reserved(VkSemaphore, context.swapchain.max_frame_in_flight);
+    context.complete_semaphore =
+        dyn_array_reserved(VkSemaphore, context.swapchain.max_frame_in_flight);
+    context.in_flight_fence =
+        dyn_array_reserved(vulkan_fence_t, context.swapchain.max_frame_in_flight);
+
+	for (uint8_t i = 0; i < context.swapchain.max_frame_in_flight; ++i) {
+		VkSemaphoreCreateInfo sm_info = {};
+		sm_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+        vkCreateSemaphore(context.device.logic_dev, &sm_info, context.alloc,
+                          &context.avail_semaphore[i]);
+        vkCreateSemaphore(context.device.logic_dev, &sm_info, context.alloc,
+                          &context.complete_semaphore[i]);
+
+        vk_fence_reset(&context, &context.in_flight_fence[i]);
+		vk_fence_init(&context, true, &context.in_flight_fence[i]);
+	}
+
+	context.image_in_flight = dyn_array_reserved(vulkan_fence_t, context.swapchain.image_count);
+	for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
+		context.image_in_flight[i] = 0;
+	}
+
+    ar_DEBUG("Vulkan API Created Successfully");
+
+	/* this for clean up all the vulkan extensions */
+	dyn_array_destroy(extension);
+	dyn_array_destroy(validation);
+
+	//print_vulkan_structs();
+	
+	ar_INFO("Renderer System Initialized");
+	return true;
+}
+
+void vk_backend_shut(render_backend_t *backend) {
+	(void)backend;
+
+	vkDeviceWaitIdle(context.device.logic_dev);
+
+	for (uint8_t i = 0; i < context.swapchain.max_frame_in_flight; ++i) {
+		if (context.avail_semaphore[i]) {
+			vkDestroySemaphore(context.device.logic_dev, context.avail_semaphore[i], context.alloc);
+			context.avail_semaphore[i] = 0;
+		}
+
+		if (context.complete_semaphore[i]) {
+			vkDestroySemaphore(context.device.logic_dev, context.complete_semaphore[i], context.alloc);
+			context.complete_semaphore[i] = 0;
+		}
+		vk_fence_shut(&context, &context.in_flight_fence[i]);
+	}
+	dyn_array_destroy(context.avail_semaphore);
+	dyn_array_destroy(context.complete_semaphore);
+	dyn_array_destroy(context.in_flight_fence);
+	dyn_array_destroy(context.image_in_flight);
+	context.avail_semaphore = 0;
+	context.complete_semaphore = 0;
+	context.in_flight_fence = 0;
+	context.image_in_flight = 0;
+
+	ar_DEBUG("Kill Vulkan Commandbuffer");
+	for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
+		if (context.graphic_comm_buffer[i].handle) {
+			vk_combuff_shut(&context, context.device.graphics_command_pool, &context.graphic_comm_buffer[i]);
+			context.graphic_comm_buffer[i].handle = 0;
+		}
+	}
+	dyn_array_destroy(context.graphic_comm_buffer);
+	context.graphic_comm_buffer = 0;
+
+	ar_DEBUG("Kill Vulkan Framebuffer");
+	for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
+		vk_framebuffer_shut(&context, &context.swapchain.framebuffer[i]);
+	}
+
+	ar_DEBUG("Kill Vulkan Renderpass");
+	vk_renderpass_shut(&context, &context.main_render);
+
+	ar_DEBUG("Kill Vulkan Swapchain");
+	vk_swapchain_shut(&context, &context.swapchain);
+
+	ar_DEBUG("Kill Vulkan Device");
+	vk_device_shut(&context);
+
+	ar_DEBUG("Kill Vulkan Surface");
+	if (context.surface) {
+		vkDestroySurfaceKHR(context.instance, context.surface, context.alloc);
+		context.surface = 0;
+	}
+
+#if defined (_DEBUG)
+	ar_DEBUG("Kill Vulkan Debugger");
+	vk_debug_shut(&context);
+#endif
+
+	ar_DEBUG("Kill Vulkan Instance");
+	vkDestroyInstance(context.instance, context.alloc);
+}
+
+void vk_backend_resize(render_backend_t *backend, uint32_t width,
+                       uint32_t height) {
+  (void)backend;
+
+  cache_framebuffer_width = (width > 0) ? width : 1;
+  cache_framebuffer_height = (height > 0) ? height : 1;
+  context.framebuffer_size_gen++;
+
+  ar_DEBUG("Vulkan Render resize: w/h/gen= %i/%i/%i", width, height,
+          context.framebuffer_size_gen);
+}
+
+b8 vk_backend_begin_frame(render_backend_t *backend, float delta_time) {
+	(void)backend;
+	context.frame_delta = delta_time;
+	
+	if (context.recreate_swap) {
+		VkResult result = vkDeviceWaitIdle(context.device.logic_dev);
+
+		if (!vk_result_is_success(result)) {
+			return false;
+		}
+
+		if (!recreate_swapchain(backend)) {
+			return false;
+		}
+
+		context.recreate_swap = false;
+	}
+
+	if (context.framebuffer_size_gen != context.framebuffer_last_gen) {
+		VkResult result = vkDeviceWaitIdle(context.device.logic_dev);
+
+		if (!vk_result_is_success(result)) {
+            ar_ERROR("vkDeviceWaitIdle (2) failed: '%s'",
+                     vk_result_string(result, true));
+            return false;
+        }
+
+		if (!recreate_swapchain(backend))
+			return false;
+
+		ar_INFO("Resized Booting");
+		return false;
+	}
+
+	//ar_DEBUG("Current Frame: %u", context.current_frame);
+	//ar_DEBUG("Max: %u", context.swapchain.max_frame_in_flight);
+    /* Wait execution frame_in_flight */
+    if (!vk_fence_wait(&context,
+                       &context.in_flight_fence[context.current_frame],
+                       UINT64_MAX)) {
+        ar_WARNING("In-flight fence wait failed");
+        return false;
+    }
+
+	/* Get Next Image */
+    if (!vk_swapchain_acquire_next_image(&context,
+                                         context.avail_semaphore
+                                             [context.current_frame],
+                                         &context.image_idx,
+                                         &context.swapchain)) {
+        return false;
+    }
+
+	if (context.image_idx >= context.swapchain.image_count) {
+        ar_ERROR("Invalid image index: %u", context.image_idx);
+        return false;
+    }
+
+	/* Begin Record Command */
+	vulkan_commandbuffer_t *combuff = &context.graphic_comm_buffer[context.image_idx];
+	vk_combuff_begin(combuff);
+
+	/* Viewport & Scissor */
+	VkViewport viewport = {};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = (float)context.framebuffer_w;
+	viewport.height = (float)context.framebuffer_h;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	VkRect2D scissor = {};
+	scissor.offset.x = scissor.offset.y = 0;
+	scissor.extent.width = context.swapchain.extents.width;
+	scissor.extent.height = context.swapchain.extents.height;
+	vkCmdSetViewport(combuff->handle, 0, 1, &viewport);
+	vkCmdSetScissor(combuff->handle, 0, 1, &scissor);
+
+	context.main_render.extents.width = context.framebuffer_w;
+	context.main_render.extents.height = context.framebuffer_h;
+
+	vk_renderpass_begin(combuff, &context.main_render, context.swapchain.framebuffer[context.image_idx].handle);
+
+    return true;
+}
+
+b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
+	(void)backend;
+	(void)delta_time;
+
+	vulkan_commandbuffer_t *combuff = &context.graphic_comm_buffer[context.image_idx];
+	vk_renderpass_end(combuff);
+	vk_combuff_end(combuff);
+
+	if (context.image_in_flight[context.image_idx] != VK_NULL_HANDLE) {
+		vk_fence_wait(&context, context.image_in_flight[context.image_idx], UINT64_MAX);
+	}
+
+	context.image_in_flight[context.image_idx] = &context.in_flight_fence[context.current_frame];
+	vk_fence_reset(&context, &context.in_flight_fence[context.current_frame]);
+
+	/* Begin Submit */
+	VkSubmitInfo submit_info = {};
+	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submit_info.commandBufferCount = 1;
+	submit_info.pCommandBuffers = &combuff->handle;
+	submit_info.signalSemaphoreCount = 1;
+	submit_info.pSignalSemaphores = &context.complete_semaphore[context.current_frame];
+	submit_info.waitSemaphoreCount = 1;
+	submit_info.pWaitSemaphores = &context.avail_semaphore[context.current_frame];
+
+	VkPipelineStageFlags flags[1] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+	submit_info.pWaitDstStageMask = flags;
+
+    VkResult result =
+        vkQueueSubmit(context.device.graphics_queue, 1, &submit_info,
+                      context.in_flight_fence[context.current_frame].handle);
+
+	if (result != VK_SUCCESS) {
+		ar_ERROR("vkQueueSubmit error");
+		return false;
+	}
+
+    vk_swapchain_present(&context, context.device.graphics_queue,
+                         context.device.present_queue,
+                         context.complete_semaphore[context.current_frame],
+                         context.image_idx, &context.swapchain);
+
+	//context.recreate_swap = false;
+    return true;
+}

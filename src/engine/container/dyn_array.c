@@ -6,7 +6,7 @@
 
 void *_array_create(uint64_t length, uint64_t stride) {
 	uint64_t size_header = DYN_ARRAY_FIELD_LENGTH * sizeof(uint64_t);
-	uint64_t size_array 	= length * stride;
+	uint64_t size_array = length * stride;
 
 	uint64_t *array = memory_alloc(size_header + size_array, MEMTAG_DYN_ARRAY);
 	if (!array) 
@@ -24,7 +24,8 @@ void *_array_create(uint64_t length, uint64_t stride) {
 void _array_destroy(void *array) {
 	uint64_t *header = (uint64_t *)array - DYN_ARRAY_FIELD_LENGTH;
 	uint64_t size_header = DYN_ARRAY_FIELD_LENGTH * sizeof(uint64_t);
-	uint64_t size_total = size_header + header[DYN_ARRAY_CAPACITY] * header[DYN_ARRAY_STRIDE];
+	uint64_t size_total = size_header + header[DYN_ARRAY_CAPACITY] * 
+						  header[DYN_ARRAY_STRIDE];
 	memory_free(header, size_total, MEMTAG_DYN_ARRAY);
 }
 
@@ -42,7 +43,8 @@ void *_array_resize(void *array) {
 	uint64_t length = dyn_array_length(array);
 	uint64_t stride = dyn_array_stride(array);
 
-	void *temp = _array_create(DYN_ARRAY_RESIZE_FACTOR * dyn_array_capacity(array), stride);
+	void *temp = _array_create(DYN_ARRAY_RESIZE_FACTOR * 
+				dyn_array_capacity(array), stride);
 	memory_copy(temp, array, length * stride);
 
 	_array_set_field(temp, DYN_ARRAY_LENGTH, length);
@@ -77,14 +79,17 @@ void *_array_pop_at(void *array, uint64_t index, void *target) {
 	uint64_t length = dyn_array_length(array);
 	uint64_t stride = dyn_array_stride(array);
 	if (index >= length) {
-		ar_WARNING("Index outside of bounds. Length: &lu, Index: %lu.", length, index);
+		ar_WARNING("Index outside of bounds. Length: &lu, Index: %lu.",
+					length, index);
 		return array;
 	}
 
 	uint64_t address = (uint64_t)array;
 	memory_copy(target, (void *)(address + (index * stride)), stride);
 	if (index != length - 1)
-		memory_copy((void *)(address + (index * stride)), (void *)(address + ((index + 1) * stride)), stride * (length - index));
+		memory_copy((void *)(address + (index * stride)),
+					(void *)(address + ((index + 1) * stride)),
+					stride * (length - index));
 
 	_array_set_field(array, DYN_ARRAY_LENGTH, length - 1);
 	return array;
@@ -94,7 +99,8 @@ void *_array_insert_at(void *array, uint64_t index, void *value_ptr) {
 	uint64_t length = dyn_array_length(array);
 	uint64_t stride = dyn_array_stride(array);
 	if (index >= length) {
-		ar_WARNING("Index outside of bounds! Length: %lu, Index: %lu.\n", length, index);
+		ar_WARNING("Index outside of bounds! Length: %lu, Index: %lu.\n",
+					length, index);
 		return array;
 	}
 
@@ -103,7 +109,9 @@ void *_array_insert_at(void *array, uint64_t index, void *value_ptr) {
 
 	uint64_t address = (uint64_t)array;
 	if (index != length - 1)
-		memory_copy((void *)(address + ((index - 1) * stride)), (void *)(address + (index * stride)), stride * (length - index));
+		memory_copy((void *)(address + ((index - 1) * stride)),
+					(void *)(address + (index * stride)),
+					stride * (length - index));
 
 	memory_copy((void *)(address + (index * stride)), value_ptr, stride);
 	_array_set_field(array, DYN_ARRAY_LENGTH, length + 1);
