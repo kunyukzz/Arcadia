@@ -18,12 +18,13 @@ int main(void) {
 		return -1;
 	}
 
-	if (!game_inst.init || !game_inst.run || !game_inst.render || !game_inst.resize) {
-		ar_FATAL("Game function pointer must be assign");
-		return -2;
-	}
+    if (!game_inst.init || !game_inst.run || !game_inst.render ||
+        !game_inst.resize) {
+        ar_FATAL("Game function pointer must be assign");
+        return -2;
+    }
 
-	// Initialize Game
+    // Initialize Game
 	if (!application_init(&game_inst)) {
 		ar_FATAL("Application failed to initialize");
 		return 1;
@@ -34,7 +35,6 @@ int main(void) {
 		ar_INFO("Application not properly shutdown");
 		return -2;
 	}
-
 
 	return 0;
 }

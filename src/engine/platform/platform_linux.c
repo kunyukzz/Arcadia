@@ -8,7 +8,6 @@
 #include "engine/core/input.h"
 
 #include <X11/Xlib.h>
-#include <X11/Xutil.h>
 #include <X11/XKBlib.h>
 #include <X11/Xlib-xcb.h>
 #include <X11/keysym.h>
@@ -38,8 +37,8 @@ static platform_state_t *p_state;
 keys translate_keycode(uint32_t x_keycode);
 
 b8 platform_init(uint64_t *memory_require, void *state, const char *name,
-                 uint32_t w, uint32_t h) {
-	*memory_require = sizeof(platform_state_t);
+                 int32_t x, int32_t y, uint32_t w, uint32_t h) {
+    *memory_require = sizeof(platform_state_t);
 	if (state == 0)
 		return true;
 
@@ -59,28 +58,15 @@ b8 platform_init(uint64_t *memory_require, void *state, const char *name,
 	uint32_t value_mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
 	uint32_t value_list[] = {p_state->screen->black_pixel, event_mask};
 
-	//uint32_t screen_width = p_state->screen->width_in_pixels;
-	//uint32_t screen_height = p_state->screen->height_in_pixels;
-	//uint32_t x = (screen_width - w) / 2;
-	//uint32_t y = (screen_height - h) / 2;
+	uint32_t screen_width = p_state->screen->width_in_pixels;
+	uint32_t screen_height = p_state->screen->height_in_pixels;
+	x = (screen_width - w) / 2;
+	y = (screen_height - h) / 2;
 
 	xcb_create_window(p_state->conn, XCB_COPY_FROM_PARENT, p_state->window,
-                    p_state->screen->root, 0, 0, w, h, 0,
+                    p_state->screen->root, x, y, w, h, 0,
                     XCB_WINDOW_CLASS_INPUT_OUTPUT, p_state->screen->root_visual,
                     value_mask, value_list);
-
-	/*
-	uint32_t values[] = {(uint32_t)x, (uint32_t)y};
-	xcb_configure_window(p_state->conn, p_state->window,
-			XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
-
-	XSizeHints *hints = XAllocSizeHints();  // Step 2: Set WM_NORMAL_HINTS
-	hints->flags = USPosition;
-	hints->x = (int)x;
-	hints->y = (int)y;
-	XSetWMNormalHints(p_state->display, p_state->window, hints);
-	XFree(hints);
-	*/
 
 	xcb_change_property(p_state->conn, XCB_PROP_MODE_REPLACE, p_state->window,
                       XCB_ATOM_WM_NAME, XCB_ATOM_STRING, 8, strlen(name), name);
@@ -104,6 +90,11 @@ b8 platform_init(uint64_t *memory_require, void *state, const char *name,
 	free(proto_reply);
 
 	xcb_map_window(p_state->conn, p_state->window);
+
+	uint32_t values[] = {(uint32_t)x, (uint32_t)y};
+	xcb_configure_window(p_state->conn, p_state->window,
+			XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, values);
+
 	xcb_flush(p_state->conn);
 
 	ar_INFO("Platform System Initialized");
@@ -172,8 +163,8 @@ b8 platform_push(void) {
 						(xcb_configure_notify_event_t *)ev;
 
 					event_context_t c;
-					c.data.u16[0] = cfg_ev->width;
-					c.data.u16[1] = cfg_ev->height;
+					c.data.u16[0] = cfg_ev->width & 0xFFFF;
+					c.data.u16[1] = cfg_ev->height & 0xFFFF;
 
 					event_push(EVENT_CODE_RESIZED, 0, c);
 				} break;

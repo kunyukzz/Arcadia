@@ -100,7 +100,7 @@ b8 app_on_resized(uint16_t code, void *sender, void *listener, event_context_t e
 			p_state->width = w;
 			p_state->height = h;
 
-			ar_DEBUG("Window resize: %i %i", w, h);
+			ar_INFO("Window resize: %i %i", w, h);
 
 			if (w == 0 || h == 0) {
 				ar_INFO("Window minimized. Suspend application");
@@ -112,6 +112,7 @@ b8 app_on_resized(uint16_t code, void *sender, void *listener, event_context_t e
 					p_state->is_suspend = false;
 				}
 				p_state->game_inst->resize(p_state->game_inst, w, h);
+				renderer_resize(w, h);
 			}
 		}
 	}
@@ -162,13 +163,16 @@ b8 application_init(struct game_entry *game_inst) {
 	event_reg(EVENT_CODE_APPLICATION_QUIT, 0, app_on_event);
 	event_reg(EVENT_CODE_KEY_PRESSED, 0, app_on_key);
 	event_reg(EVENT_CODE_KEY_RELEASE, 0, app_on_key);
+	event_reg(EVENT_CODE_RESIZED, 0, app_on_resized);
 
 	/* set platform memory allocation */
-	platform_init(&p_state->platform.size, 0, 0, 0, 0);
+	platform_init(&p_state->platform.size, 0, 0, 0, 0, 0, 0);
 	p_state->platform.state =
 		arena_allocate(&p_state->arena, p_state->platform.size);
 	if (!platform_init(&p_state->platform.size, p_state->platform.state,
 					   game_inst->app_config.name,
+					   game_inst->app_config.pos_x,
+					   game_inst->app_config.pos_y,
 					   game_inst->app_config.width,
 					   game_inst->app_config.height)) return false;
 
@@ -266,6 +270,7 @@ b8 application_run(void) {
 	event_unreg(EVENT_CODE_APPLICATION_QUIT, 0, app_on_event);
 	event_unreg(EVENT_CODE_KEY_PRESSED, 0, app_on_key);
 	event_unreg(EVENT_CODE_KEY_RELEASE, 0, app_on_key);
+	event_unreg(EVENT_CODE_RESIZED, 0, app_on_resized);
 
 	input_shut(p_state->input.state);
 	renderer_shut(p_state->renderer.state);
