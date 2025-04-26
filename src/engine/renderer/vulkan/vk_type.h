@@ -83,6 +83,37 @@ typedef struct vulkan_device_t {
 	int32_t transfer_idx;
 } vulkan_device_t;
 
+/* ========================== Vulkan Pipeline =============================== */
+typedef struct vulkan_pipeline_t {
+	VkPipeline handle;
+	VkPipelineLayout pipe_layout;
+} vulkan_pipeline_t;
+
+/* =========================== Vulkan Shaders =============================== */
+typedef struct vulkan_shader_stage_t {
+	VkShaderModuleCreateInfo cr_info;
+	VkShaderModule handle;
+	VkPipelineShaderStageCreateInfo shader_stg_cr_info;
+} vulkan_shader_stage_t;
+
+#define OBJ_SHADER_STAGE_COUNT 2
+
+typedef struct vulkan_object_shader_t {
+	vulkan_shader_stage_t stages[OBJ_SHADER_STAGE_COUNT];
+	vulkan_pipeline_t pipeline;
+} vulkan_object_shader_t;
+
+/* =========================== Vulkan Buffers =============================== */
+typedef struct vulkan_buffer_t {
+	uint64_t total_size;
+	VkBuffer handle;
+	VkBufferUsageFlagBits usage;
+	b8 is_locked;
+	VkDeviceMemory memory;
+	int32_t mem_idx;
+	uint32_t mem_prop_flag;
+} vulkan_buffer_t;
+
 /* =========================== Vulkan Context =============================== */
 typedef struct vulkan_context_t {
 	
@@ -101,7 +132,13 @@ typedef struct vulkan_context_t {
 	vulkan_fence_t *in_flight_fence;
 	vulkan_fence_t **image_in_flight;
 
+	vulkan_buffer_t obj_vert_buffer;
+	vulkan_buffer_t obj_idx_buffer;
+
 	float frame_delta;
+
+	uint64_t geo_vert_offset;
+	uint64_t geo_idx_offset;
 
 	uint64_t framebuffer_size_gen;
 	uint64_t framebuffer_last_gen;
@@ -114,8 +151,10 @@ typedef struct vulkan_context_t {
 	uint32_t current_frame;
 
 	b8 recreate_swap;
+	vulkan_object_shader_t obj_shader;
 
 	int32_t (*find_mem_idx)(uint32_t type_filter, uint32_t prop_flag);
 } vulkan_context_t;
+
 
 #endif //__VULKAN_TYPE_H__

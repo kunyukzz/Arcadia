@@ -2,6 +2,7 @@
 
 #include "engine/core/application.h"
 #include "engine/core/logger.h"
+#include "engine/math/math_type.h"
 
 #include "engine/renderer/vulkan/vk_type.h"
 #include "engine/renderer/vulkan/vk_debug.h"
@@ -14,6 +15,10 @@
 #include "engine/renderer/vulkan/vk_framebuffer.h"
 #include "engine/renderer/vulkan/vk_fence.h"
 #include "engine/renderer/vulkan/vk_result.h"
+#include "engine/renderer/vulkan/vk_buffer.h"
+
+// Shaders
+#include "engine/renderer/vulkan/shaders/vk_obj_shader.h"
 
 #include <vulkan/vulkan_core.h>
 
@@ -37,6 +42,35 @@ int32_t find_mem_idx(uint32_t type_filter, uint32_t prop_flag) {
 
 	ar_WARNING("Unable to find suitable memory type");
 	return -1;
+}
+
+b8 buffer_init(vulkan_context_t *ctx) {
+    VkMemoryPropertyFlagBits mem_property_flag =
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+    const uint64_t vertex_buffer_size = sizeof(vertex_3d) * 1024 * 1024;
+    if (!vk_buffer_init(ctx, vertex_buffer_size,
+                        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                        VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                        mem_property_flag, true, &ctx->obj_vert_buffer)) {
+        ar_ERROR("Error creating vertex buffer.");
+        return false;
+    }
+    ctx->geo_vert_offset = 0;
+
+    const uint64_t index_buffer_size = sizeof(uint32_t) * 1024 * 1024;
+    if (!vk_buffer_init(ctx, index_buffer_size,
+                        VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                        VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                        mem_property_flag, true, &ctx->obj_idx_buffer)) {
+        ar_ERROR("Error creating index buffer");
+        return false;
+    }
+    ctx->geo_idx_offset = 0;
+
+    return true;
 }
 
 void command_buffer_init(render_backend_t *be) {
@@ -227,10 +261,18 @@ b8 vk_backend_init(render_backend_t *backend, const char *name) {
 		vk_fence_init(&context, true, &context.in_flight_fence[i]);
 	}
 
-	context.image_in_flight = dyn_array_reserved(vulkan_fence_t, context.swapchain.image_count);
-	for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
-		context.image_in_flight[i] = 0;
+    context.image_in_flight =
+        dyn_array_reserved(vulkan_fence_t, context.swapchain.image_count);
+    for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
+        context.image_in_flight[i] = 0;
+    }
+
+    if (!vk_obj_shader_init(&context, &context.obj_shader)) {
+		ar_ERROR("Error loading Builtin shader");
+		return false;
 	}
+
+	buffer_init(&context);
 
     ar_DEBUG("Vulkan API Created Successfully");
 
@@ -249,19 +291,28 @@ void vk_backend_shut(render_backend_t *backend) {
 
 	vkDeviceWaitIdle(context.device.logic_dev);
 
-	for (uint8_t i = 0; i < context.swapchain.max_frame_in_flight; ++i) {
-		if (context.avail_semaphore[i]) {
-			vkDestroySemaphore(context.device.logic_dev, context.avail_semaphore[i], context.alloc);
-			context.avail_semaphore[i] = 0;
-		}
+	ar_DEBUG("Kill Vulkan Buffer");
+	vk_buffer_shut(&context, &context.obj_idx_buffer);
+	vk_buffer_shut(&context, &context.obj_vert_buffer);
 
-		if (context.complete_semaphore[i]) {
-			vkDestroySemaphore(context.device.logic_dev, context.complete_semaphore[i], context.alloc);
-			context.complete_semaphore[i] = 0;
-		}
-		vk_fence_shut(&context, &context.in_flight_fence[i]);
-	}
-	dyn_array_destroy(context.avail_semaphore);
+	ar_DEBUG("Kill Vulkan Object Shaders");
+	vk_obj_shader_shut(&context, &context.obj_shader);
+
+    for (uint8_t i = 0; i < context.swapchain.max_frame_in_flight; ++i) {
+        if (context.avail_semaphore[i]) {
+            vkDestroySemaphore(context.device.logic_dev,
+                               context.avail_semaphore[i], context.alloc);
+            context.avail_semaphore[i] = 0;
+        }
+
+        if (context.complete_semaphore[i]) {
+            vkDestroySemaphore(context.device.logic_dev,
+                               context.complete_semaphore[i], context.alloc);
+            context.complete_semaphore[i] = 0;
+        }
+        vk_fence_shut(&context, &context.in_flight_fence[i]);
+    }
+    dyn_array_destroy(context.avail_semaphore);
 	dyn_array_destroy(context.complete_semaphore);
 	dyn_array_destroy(context.in_flight_fence);
 	dyn_array_destroy(context.image_in_flight);
@@ -271,13 +322,14 @@ void vk_backend_shut(render_backend_t *backend) {
 	context.image_in_flight = 0;
 
 	ar_DEBUG("Kill Vulkan Commandbuffer");
-	for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
-		if (context.graphic_comm_buffer[i].handle) {
-			vk_combuff_shut(&context, context.device.graphics_command_pool, &context.graphic_comm_buffer[i]);
-			context.graphic_comm_buffer[i].handle = 0;
-		}
-	}
-	dyn_array_destroy(context.graphic_comm_buffer);
+    for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
+        if (context.graphic_comm_buffer[i].handle) {
+            vk_combuff_shut(&context, context.device.graphics_command_pool,
+                            &context.graphic_comm_buffer[i]);
+            context.graphic_comm_buffer[i].handle = 0;
+        }
+    }
+    dyn_array_destroy(context.graphic_comm_buffer);
 	context.graphic_comm_buffer = 0;
 
 	ar_DEBUG("Kill Vulkan Framebuffer");
@@ -380,10 +432,11 @@ b8 vk_backend_begin_frame(render_backend_t *backend, float delta_time) {
     }
 
 	/* Begin Record Command */
-	vulkan_commandbuffer_t *combuff = &context.graphic_comm_buffer[context.image_idx];
-	vk_combuff_begin(combuff);
+    vulkan_commandbuffer_t *combuff =
+        &context.graphic_comm_buffer[context.image_idx];
+    vk_combuff_begin(combuff);
 
-	/* Viewport & Scissor */
+    /* Viewport & Scissor */
 	VkViewport viewport = {};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
@@ -402,7 +455,9 @@ b8 vk_backend_begin_frame(render_backend_t *backend, float delta_time) {
 	context.main_render.extents.width = context.framebuffer_w;
 	context.main_render.extents.height = context.framebuffer_h;
 
-	vk_renderpass_begin(combuff, &context.main_render, context.swapchain.framebuffer[context.image_idx].handle);
+    vk_renderpass_begin(combuff, &context.main_render,
+                        context.swapchain.framebuffer[context.image_idx]
+                            .handle);
 
     return true;
 }
@@ -411,29 +466,35 @@ b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
 	(void)backend;
 	(void)delta_time;
 
-	vulkan_commandbuffer_t *combuff = &context.graphic_comm_buffer[context.image_idx];
-	vk_renderpass_end(combuff);
-	vk_combuff_end(combuff);
+    vulkan_commandbuffer_t *combuff =
+        &context.graphic_comm_buffer[context.image_idx];
+    vk_renderpass_end(combuff);
+    vk_combuff_end(combuff);
 
-	if (context.image_in_flight[context.image_idx] != VK_NULL_HANDLE) {
-		vk_fence_wait(&context, context.image_in_flight[context.image_idx], UINT64_MAX);
-	}
+    if (context.image_in_flight[context.image_idx] != VK_NULL_HANDLE) {
+        vk_fence_wait(&context, context.image_in_flight[context.image_idx],
+                      UINT64_MAX);
+    }
 
-	context.image_in_flight[context.image_idx] = &context.in_flight_fence[context.current_frame];
-	vk_fence_reset(&context, &context.in_flight_fence[context.current_frame]);
+    context.image_in_flight[context.image_idx] =
+        &context.in_flight_fence[context.current_frame];
+    vk_fence_reset(&context, &context.in_flight_fence[context.current_frame]);
 
-	/* Begin Submit */
-	VkSubmitInfo submit_info = {};
-	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submit_info.commandBufferCount = 1;
-	submit_info.pCommandBuffers = &combuff->handle;
-	submit_info.signalSemaphoreCount = 1;
-	submit_info.pSignalSemaphores = &context.complete_semaphore[context.current_frame];
-	submit_info.waitSemaphoreCount = 1;
-	submit_info.pWaitSemaphores = &context.avail_semaphore[context.current_frame];
+    /* Begin Submit */
+    VkSubmitInfo submit_info         = {};
+    submit_info.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount   = 1;
+    submit_info.pCommandBuffers      = &combuff->handle;
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores =
+        &context.complete_semaphore[context.current_frame];
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores =
+        &context.avail_semaphore[context.current_frame];
 
-	VkPipelineStageFlags flags[1] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-	submit_info.pWaitDstStageMask = flags;
+    VkPipelineStageFlags flags[1] = {
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    submit_info.pWaitDstStageMask = flags;
 
     VkResult result =
         vkQueueSubmit(context.device.graphics_queue, 1, &submit_info,
@@ -449,6 +510,5 @@ b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
                          context.complete_semaphore[context.current_frame],
                          context.image_idx, &context.swapchain);
 
-	//context.recreate_swap = false;
     return true;
 }

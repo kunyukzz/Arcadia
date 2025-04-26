@@ -5,7 +5,7 @@
             "name": "(Linux) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/debug/rcadia",
+            "program": "${workspaceFolder}/bin/rcadia",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin/",

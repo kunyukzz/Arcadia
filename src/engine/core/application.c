@@ -100,8 +100,6 @@ b8 app_on_resized(uint16_t code, void *sender, void *listener, event_context_t e
 			p_state->width = w;
 			p_state->height = h;
 
-			ar_INFO("Window resize: %i %i", w, h);
-
 			if (w == 0 || h == 0) {
 				ar_INFO("Window minimized. Suspend application");
 				p_state->is_suspend = true;
