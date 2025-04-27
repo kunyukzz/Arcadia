@@ -49,7 +49,7 @@ void vk_internal_swapchain(vulkan_context_t *ctx, vulkan_swapchain_t *swap,
     }
 
 	swap->max_frame_in_flight = img_count - 1;
-    ar_TRACE("Swapchain Image Count: %u, Max Fame in Flight: %u", img_count,
+    ar_TRACE("Swapchain Image Count: %u, Max Frame-In-Flight: %u", img_count,
             swap->max_frame_in_flight);
 
     /* Set Present Mode */
@@ -117,12 +117,12 @@ void vk_internal_swapchain(vulkan_context_t *ctx, vulkan_swapchain_t *swap,
 
 	vk_image_view_init(ctx, swap);
     vk_image_init(ctx, VK_IMAGE_TYPE_2D, ctx->device.depth_format,
-                  VK_IMAGE_TILING_OPTIMAL,
+                  VK_IMAGE_TILING_OPTIMAL, swap->extents.width, swap->extents.height,
                   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT,
                   &swap->image_attach);
 	vk_image_view_from_image(ctx, &swap->image_attach,
-                         VK_FORMAT_D32_SFLOAT,
+                         ctx->device.depth_format,
                          VK_IMAGE_ASPECT_DEPTH_BIT,
                          &swap->image_attach.image_view);
 
@@ -137,6 +137,7 @@ void vk_swapchain_init(vulkan_context_t *ctx, vulkan_swapchain_t *swap) {
 }
 
 b8 vk_swapchain_reinit(vulkan_context_t *ctx, vulkan_swapchain_t *swap) {
+
 	VkSwapchainKHR old = swap->handle;
 	vk_internal_swapchain(ctx, swap, old);
 
@@ -241,19 +242,20 @@ void vk_image_view_init(vulkan_context_t *ctx, vulkan_swapchain_t *swap) {
 
 void vk_image_init(vulkan_context_t *ctx, VkImageType img_type,
                    VkFormat formats, VkImageTiling tiling,
+				   uint32_t width, uint32_t height,
                    VkImageUsageFlags usage, VkMemoryPropertyFlags mem_prop,
                    VkImageAspectFlags aspects, vulkan_image_t *image) {
 	(void)img_type;
 	(void)aspects;
 
-	image->width = ctx->framebuffer_w;
-	image->height = ctx->framebuffer_h;
+	image->width = width;
+	image->height = height;
 
 	VkImageCreateInfo img_info = {};
 	img_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	img_info.imageType = VK_IMAGE_TYPE_2D;
-	img_info.extent.width = ctx->framebuffer_w;
-	img_info.extent.height = ctx->framebuffer_h;
+	img_info.extent.width = width;
+	img_info.extent.height = height;
 	img_info.extent.depth = 1;
 	img_info.mipLevels = 1;
 	img_info.arrayLayers = 1;
@@ -306,16 +308,19 @@ void vk_swapchain_shut(vulkan_context_t *ctx, vulkan_swapchain_t *swap) {
 	vk_image_view_shut(ctx, swap);
 	vk_image_shut(ctx, &swap->image_attach);
 
+	/*
     for (uint32_t i = 0; i < swap->image_count; ++i) {
         vkDestroyImageView(ctx->device.logic_dev, swap->image_view[i],
                            ctx->alloc);
     }
+	*/
     vkDestroyImageView(ctx->device.logic_dev, swap->image_attach.image_view,
                        ctx->alloc);
     vkDestroySwapchainKHR(ctx->device.logic_dev, swap->handle, ctx->alloc);
 }
 
 void vk_image_view_shut(vulkan_context_t *ctx, vulkan_swapchain_t *swap) {
+	vkDeviceWaitIdle(ctx->device.logic_dev);
     if (swap->image_view) {
         for (uint32_t i = 0; i < swap->image_count; ++i) {
             if (swap->image_view[i]) {
@@ -340,6 +345,7 @@ void vk_image_view_shut(vulkan_context_t *ctx, vulkan_swapchain_t *swap) {
 }
 
 void vk_image_shut(vulkan_context_t *ctx, vulkan_image_t *image) {
+	vkDeviceWaitIdle(ctx->device.logic_dev);
 	if (image->image_view) {
 		vkDestroyImageView(ctx->device.logic_dev, image->image_view, ctx->alloc);
 		image->image_view = 0;

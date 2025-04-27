@@ -17,4 +17,33 @@ typedef _Bool b8;
 #define ar_CLAMP(value, min, max)                                              \
   (value <= min) ? min : (value >= max) ? max : value
 
+// Imports
+#ifdef _MSC_VER
+	#define _arapi __declspec(dllimport)
+#else
+	#define _arapi
+#endif
+
+// Inline
+#if defined(__clang__) || defined(__gcc__)
+	#define _arinline __attribute__((always_inline)) inline
+	#define _arnoinline __attribute__((noinline))
+#elif defined(_MSC_VER)
+	#define _arinline __forceinline
+	#define _arnoinline __declspec(noinline)
+#endif
+
+// SIMD
+#ifdef _arsimd
+	#ifdef _MSC_VER
+		#define _aralignas __declspec(align(16))
+	#else
+		#define _aralignas __attribute__((aligned(16)))
+	#endif
+#endif //_arsimd
+
+#ifndef _aralignas
+	#define _aralignas
+#endif
+
 #endif //__DEFINE_H__

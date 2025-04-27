@@ -35,6 +35,8 @@ typedef enum event_code_t {
     EVENT_CODE_MOUSE_MOVE       = 0x06, // mouse moved
     EVENT_CODE_MOUSE_WHEEL      = 0x07, // mouse wheel
     EVENT_CODE_RESIZED          = 0x08, // resize window
+	EVENT_CODE_APP_SUSPEND      = 0x09, // New internal event for suspend
+    EVENT_CODE_APP_RESUME       = 0x0A, // New internal event for resume
     MAX_EVENT_CODE              = 0xFF
 } event_code_t;
 

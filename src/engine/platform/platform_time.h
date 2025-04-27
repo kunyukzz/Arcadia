@@ -9,7 +9,7 @@ typedef struct platform_time_t {
 	double elapsed;
 } platform_time_t;
 
-static inline double get_absolute_time(void) {
+_arinline double get_absolute_time(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec + ts.tv_nsec / 1e9;
@@ -31,23 +31,23 @@ static inline double get_absolute_time(void) {
     return 0;
 }
 
-static inline void os_sleep(uint64_t ms) {
+_arinline void os_sleep(uint64_t ms) {
 	struct timespec ts;
 	ts.tv_sec = ms / 1000;
 	ts.tv_nsec = (ms % 1000) * 1000 * 1000;
 }
 
-static inline void time_start(platform_time_t *time) {
+_arinline void time_start(platform_time_t *time) {
 	time->start_time = get_absolute_time();
 	time->elapsed = 0;
 }
 
-static inline void time_update(platform_time_t *time) {
+_arinline void time_update(platform_time_t *time) {
 	if (time->start_time != 0)
 		time->elapsed = get_absolute_time() - time->elapsed;
 }
 
-static inline void time_sleep(platform_time_t *time) {
+_arinline void time_sleep(platform_time_t *time) {
 	time->start_time = 0;
 }
 
