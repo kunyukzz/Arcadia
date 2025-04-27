@@ -12,6 +12,7 @@
 #include <X11/Xlib-xcb.h>
 #include <X11/keysym.h>
 #include <xcb/xcb.h>
+#include <xcb/xcb_icccm.h>
 
 #define VK_USE_PLATFORM_XCB_KHR
 #include "engine/renderer/vulkan/vk_type.h"
@@ -28,6 +29,7 @@ typedef struct platform_state_t {
 
 	xcb_atom_t wm_protocol;
 	xcb_atom_t wm_delete_win;
+	xcb_atom_t wm_state;
 
 	VkSurfaceKHR surface;
 } platform_state_t;
@@ -73,21 +75,28 @@ b8 platform_init(uint64_t *memory_require, void *state, const char *name,
 
 	xcb_intern_atom_cookie_t del_cookie = xcb_intern_atom(p_state->conn, 0,
 			strlen("WM_DELETE_WINDOW"), "WM_DELETE_WINDOW");
-	xcb_intern_atom_cookie_t proto_cookie =
-		xcb_intern_atom(p_state->conn, 0, strlen("WM_PROTOCOLS"), "WM_PROTOCOLS");
-	xcb_intern_atom_reply_t *del_reply =
+    xcb_intern_atom_cookie_t wm_cookie =
+        xcb_intern_atom(p_state->conn, 0, strlen("WM_STATE"), "WM_STATE");
+    xcb_intern_atom_cookie_t proto_cookie =
+        xcb_intern_atom(p_state->conn, 0, strlen("WM_PROTOCOLS"),
+                        "WM_PROTOCOLS");
+    xcb_intern_atom_reply_t *del_reply =
 		xcb_intern_atom_reply(p_state->conn, del_cookie, NULL);
 	xcb_intern_atom_reply_t *proto_reply =
 		xcb_intern_atom_reply(p_state->conn, proto_cookie, NULL);
+    xcb_intern_atom_reply_t *wm_reply =
+        xcb_intern_atom_reply(p_state->conn, wm_cookie, NULL);
 
-	p_state->wm_delete_win = del_reply->atom;
+    p_state->wm_delete_win = del_reply->atom;
 	p_state->wm_protocol = proto_reply->atom;
+	p_state->wm_state = wm_reply->atom;
 
 	xcb_change_property(p_state->conn, XCB_PROP_MODE_REPLACE, p_state->window,
 			proto_reply->atom, 4, 32, 1, &del_reply->atom);
 
 	free(del_reply);
 	free(proto_reply);
+	free(wm_reply);
 
 	xcb_map_window(p_state->conn, p_state->window);
 
@@ -99,6 +108,25 @@ b8 platform_init(uint64_t *memory_require, void *state, const char *name,
 
 	ar_INFO("Platform System Initialized");
 	return true;
+}
+
+b8 is_window_minimized(xcb_connection_t *conn, xcb_window_t window) {
+    xcb_get_property_cookie_t cookie =
+        xcb_get_property(conn, 0, window, p_state->wm_state, p_state->wm_state,
+                         0, 2);
+    xcb_get_property_reply_t *reply =
+        xcb_get_property_reply(conn, cookie, NULL);
+    if (reply) {
+        if (reply->type == p_state->wm_state && reply->format == 32 &&
+            reply->value_len >= 2) {
+            uint32_t *state  = (uint32_t *)xcb_get_property_value(reply);
+            b8        result = (state[0] == XCB_ICCCM_WM_STATE_ICONIC);
+            free(reply);
+            return result;
+        }
+        free(reply);
+    }
+    return false;
 }
 
 void platform_shut(void *state) {
@@ -163,13 +191,24 @@ b8 platform_push(void) {
 						(xcb_configure_notify_event_t *)ev;
 
 					event_context_t c;
-					c.data.u16[0] = cfg_ev->width & 0xFFFF;
-					c.data.u16[1] = cfg_ev->height & 0xFFFF;
+					c.data.u16[0] = cfg_ev->width;
+					c.data.u16[1] = cfg_ev->height;
 
 					event_push(EVENT_CODE_RESIZED, 0, c);
 				} break;
 
-				case XCB_CLIENT_MESSAGE: {
+				case XCB_UNMAP_NOTIFY:
+				case XCB_MAP_NOTIFY: {
+
+                    event_context_t c = {0};
+                    if (is_window_minimized(p_state->conn, p_state->window)) {
+						event_push(EVENT_CODE_APP_SUSPEND, 0, c);
+					} else {
+						event_push(EVENT_CODE_APP_RESUME, 0, c);
+					}
+				} break;
+
+                case XCB_CLIENT_MESSAGE: {
 					cm = (xcb_client_message_event_t *)ev;
 
 					if (cm->data.data32[0] == p_state->wm_delete_win) {

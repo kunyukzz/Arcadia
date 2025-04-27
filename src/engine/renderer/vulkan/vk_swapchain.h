@@ -17,6 +17,7 @@ b8   vk_swapchain_present(vulkan_context_t *ctx, VkQueue graphics_queue,
 void vk_image_view_init(vulkan_context_t *ctx, vulkan_swapchain_t *swap);
 void vk_image_init(vulkan_context_t *ctx, VkImageType img_type,
                    VkFormat formats, VkImageTiling tiling,
+				   uint32_t width, uint32_t height,
                    VkImageUsageFlags usage, VkMemoryPropertyFlags mem_prop,
                    VkImageAspectFlags aspects, vulkan_image_t *image);
 void vk_image_view_from_image(vulkan_context_t *ctx, vulkan_image_t *image,

@@ -58,6 +58,17 @@ b8 app_on_event(uint16_t code, void *sender, void *listener, event_context_t ec)
 			p_state->is_running = false;
 			return true;
 		}
+		case EVENT_CODE_APP_SUSPEND: {
+			ar_INFO("EVENT_CODE_APP_SUSPEND received. Suspend.");
+			p_state->is_suspend = true;
+			return true;
+		}
+		case EVENT_CODE_APP_RESUME: {
+			ar_INFO("EVENT_CODE_APP_RESUME received. Resume.");
+			p_state->is_suspend = false;
+			p_state->is_running = true;
+			return true;
+		}
 	}
 	
 	return false;
@@ -129,14 +140,13 @@ b8 application_init(struct game_entry *game_inst) {
 
 	game_inst->app_state = memory_alloc(sizeof(*p_state), MEMTAG_APPLICATION);
 	p_state = game_inst->app_state;
-
 	p_state->game_inst = game_inst;
 	p_state->is_running = false;
 	p_state->is_suspend = false;
 
 	/* set chunk of memory allocation */
 	uint64_t total_size_alloc = 64 * 1024 * 1024; // 64 Mb
-	arena_init(total_size_alloc, NULL, &p_state->arena);
+	arena_init(total_size_alloc, 0, &p_state->arena);
 
 	/* Set event memory allocation */
 	event_init(&p_state->event.size, 0);
@@ -162,6 +172,8 @@ b8 application_init(struct game_entry *game_inst) {
 	event_reg(EVENT_CODE_KEY_PRESSED, 0, app_on_key);
 	event_reg(EVENT_CODE_KEY_RELEASE, 0, app_on_key);
 	event_reg(EVENT_CODE_RESIZED, 0, app_on_resized);
+	event_reg(EVENT_CODE_APP_SUSPEND, 0, app_on_event);
+	event_reg(EVENT_CODE_APP_RESUME, 0, app_on_event);
 
 	/* set platform memory allocation */
 	platform_init(&p_state->platform.size, 0, 0, 0, 0, 0, 0);
@@ -269,6 +281,9 @@ b8 application_run(void) {
 	event_unreg(EVENT_CODE_KEY_PRESSED, 0, app_on_key);
 	event_unreg(EVENT_CODE_KEY_RELEASE, 0, app_on_key);
 	event_unreg(EVENT_CODE_RESIZED, 0, app_on_resized);
+	event_unreg(EVENT_CODE_APP_SUSPEND, 0, app_on_event);
+	event_unreg(EVENT_CODE_APP_RESUME, 0, app_on_event);
+	
 
 	input_shut(p_state->input.state);
 	renderer_shut(p_state->renderer.state);

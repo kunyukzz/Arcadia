@@ -12,5 +12,12 @@ if ! make BUILD=$BUILD_TYPE; then
 	exit 1
 fi
 
+if [ -f ./post_build.sh ]; then
+    echo "Running post build script..."
+    ./post_build.sh
+else
+    echo "No post build script found, skipping."
+fi
+
 echo "Done"
 echo "All assemblies built successfully."

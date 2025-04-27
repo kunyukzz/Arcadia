@@ -130,7 +130,7 @@ b8 recreate_swapchain(render_backend_t *be) {
 	vkDeviceWaitIdle(context.device.logic_dev);
 
 	vk_image_view_shut(&context, &context.swapchain);
-	vk_image_shut(&context, &context.swapchain.image_attach);
+	//vk_image_shut(&context, &context.swapchain.image_attach);
 	vk_swapchain_reinit(&context, &context.swapchain);
 	
 	context.framebuffer_w = cache_framebuffer_width;
@@ -407,8 +407,6 @@ b8 vk_backend_begin_frame(render_backend_t *backend, float delta_time) {
 		return false;
 	}
 
-	//ar_DEBUG("Current Frame: %u", context.current_frame);
-	//ar_DEBUG("Max: %u", context.swapchain.max_frame_in_flight);
     /* Wait execution frame_in_flight */
     if (!vk_fence_wait(&context,
                        &context.in_flight_fence[context.current_frame],
@@ -425,6 +423,7 @@ b8 vk_backend_begin_frame(render_backend_t *backend, float delta_time) {
                                          &context.swapchain)) {
         return false;
     }
+
 
 	if (context.image_idx >= context.swapchain.image_count) {
         ar_ERROR("Invalid image index: %u", context.image_idx);

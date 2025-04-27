@@ -12,13 +12,15 @@ b8 vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
                     VkDescriptorSetLayout *set_layout, uint32_t stg_count,
                     VkPipelineShaderStageCreateInfo *stg, VkViewport viewport,
                     VkRect2D scissor, b8 is_wireframe, vulkan_pipeline_t *pipeline) {
+	(void)viewport;
+	(void)scissor;
 	/* Viewport State */
 	VkPipelineViewportStateCreateInfo vw_info = {};
 	vw_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	vw_info.viewportCount = 1;
-	vw_info.pViewports = &viewport;
+	vw_info.pViewports = NULL;
 	vw_info.scissorCount = 1;
-	vw_info.pScissors = &scissor;
+	vw_info.pScissors = NULL;
 
 	/* Rasterize */
 	VkPipelineRasterizationStateCreateInfo raster_info = {};
