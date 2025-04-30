@@ -8,10 +8,11 @@ b8   vk_obj_shader_init(vulkan_context_t *ctx, vulkan_object_shader_t *shader);
 void vk_obj_shader_shut(vulkan_context_t *ctx, vulkan_object_shader_t *shader);
 void vk_obj_shader_use(vulkan_context_t *ctx, vulkan_object_shader_t *shader);
 
+void vk_obj_shader_update_global_state(vulkan_context_t       *ctx,
+                                       vulkan_object_shader_t *shader);
+
 /*
-void vk_obj_shader_update_global_state(vulkan_context_t *ctx,
-vulkan_object_shader_t *shader, float delta_time); void
-vk_obj_shader_update_obj(vulkan_context_t *ctx, vulkan_object_shader_t *shader,
+void vk_obj_shader_update_obj(vulkan_context_t *ctx, vulkan_object_shader_t *shader,
 geo_render_data_t data);
 */
 

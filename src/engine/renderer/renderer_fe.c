@@ -2,6 +2,7 @@
 #include "engine/renderer/renderer_be.h"
 
 #include "engine/core/logger.h"
+#include "engine/math/maths.h"
 
 typedef struct render_state_t {
 	render_backend_t backend;
@@ -60,15 +61,25 @@ void renderer_resize(uint32_t width, uint32_t height) {
 	if (p_state) {
 		p_state->backend.resize(&p_state->backend, width, height);	
 	} else {
-		ar_WARNING("renderer backend does not exist to perform resize: %i %i", width, height);	
-	}
+        ar_WARNING("renderer backend does not exist to perform resize: %i %i",
+                   width, height);
+    }
 }
 
 b8 renderer_draw_frame(render_packet_t *packet) {
 	if (renderer_begin_frame(packet->delta)) {
+        mat4 projection = mat4_perspective(deg_to_rad(45.0f), 1280.0f / 720.0f,
+                                           0.1f, 1000.0f);
+		static float z = -1.0f;
+		z -= 0.05f;
+		mat4 view = mat4_translation( (vec3){ .x = 0.0f, .y = 0.0f, .z = z} );
+		//ar_INFO("view: %f", z);
+
+        p_state->backend.update_global(projection, view,
+                                       vec3_zero(), vec4_one(), 0);
+
 		b8 result = renderer_end_frame(packet->delta);
-		
-		if (!result) {
+        if (!result) {
 			ar_ERROR("renderer_end_frame failed. Shut");
 			return false;
 		}

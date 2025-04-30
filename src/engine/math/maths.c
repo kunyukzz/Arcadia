@@ -84,7 +84,7 @@ mat4 mat4_perspective(float fov_rad, float aspect_ratio, float near,
 
     result.data[0]  = 1.0f / (aspect_ratio * half_tan_fov);
     result.data[5]  = 1.0f / half_tan_fov;
-    result.data[10] = -((far + near) / (far - near));
+    result.data[10] = -((far + near) / (far - near)); // OpenGL Depth Style
     result.data[11] = -1.0f;
     result.data[14] = -((2.0f * far * near) / (far - near));
 

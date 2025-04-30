@@ -11,8 +11,9 @@ b8 vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
                     uint32_t                           set_layout_count,
                     VkDescriptorSetLayout *set_layout, uint32_t stg_count,
                     VkPipelineShaderStageCreateInfo *stg, VkViewport viewport,
-                    VkRect2D scissor, b8 is_wireframe, vulkan_pipeline_t *pipeline) {
-	(void)viewport;
+                    VkRect2D scissor, b8 is_wireframe,
+                    vulkan_pipeline_t *pipeline) {
+    (void)viewport;
 	(void)scissor;
 	/* Viewport State */
 	VkPipelineViewportStateCreateInfo vw_info = {};
@@ -24,13 +25,15 @@ b8 vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
 
 	/* Rasterize */
 	VkPipelineRasterizationStateCreateInfo raster_info = {};
-	raster_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	raster_info.depthClampEnable = VK_FALSE;
-	raster_info.rasterizerDiscardEnable = VK_FALSE;
-	raster_info.polygonMode = is_wireframe ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL;
-	raster_info.lineWidth = 1;
-	raster_info.cullMode = VK_CULL_MODE_BACK_BIT;
-	raster_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    raster_info.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    raster_info.depthClampEnable        = VK_FALSE;
+    raster_info.rasterizerDiscardEnable = VK_FALSE;
+    raster_info.polygonMode =
+        is_wireframe ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL;
+    raster_info.lineWidth = 1;
+    raster_info.cullMode = VK_CULL_MODE_BACK_BIT;
+	raster_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
 	raster_info.depthBiasEnable = VK_FALSE;
 	raster_info.depthBiasConstantFactor = 0.0f;
 	raster_info.depthBiasClamp = 0.0f;
@@ -48,9 +51,10 @@ b8 vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
 
 	/* Depth & Stencil */
 	VkPipelineDepthStencilStateCreateInfo depth_stc_info = {};
-	depth_stc_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	depth_stc_info.depthTestEnable = VK_TRUE;
-	depth_stc_info.depthWriteEnable = VK_TRUE;
+    depth_stc_info.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depth_stc_info.depthTestEnable  = VK_TRUE;
+    depth_stc_info.depthWriteEnable = VK_TRUE;
 	depth_stc_info.depthCompareOp = VK_COMPARE_OP_LESS;
 	depth_stc_info.depthBoundsTestEnable = VK_FALSE;
 	depth_stc_info.stencilTestEnable = VK_FALSE;
@@ -152,17 +156,18 @@ b8 vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
 		return true;
     }
 
-    ar_ERROR("Graphics Pipeline failed with: %s", vk_result_string(result, true));
-	return false;
-
+    ar_ERROR("Graphics Pipeline failed with: %s",
+             vk_result_string(result, true));
+    return false;
 }
 
 void vk_pipeline_shut(vulkan_context_t *ctx, vulkan_pipeline_t *pipeline) {
 	if (pipeline) {
 		if (pipeline->handle) {
-			vkDestroyPipeline(ctx->device.logic_dev, pipeline->handle, ctx->alloc);
-			pipeline->handle = 0;
-		}
+            vkDestroyPipeline(ctx->device.logic_dev, pipeline->handle,
+                              ctx->alloc);
+            pipeline->handle = 0;
+        }
 
 		if (pipeline->pipe_layout) {
             vkDestroyPipelineLayout(ctx->device.logic_dev,

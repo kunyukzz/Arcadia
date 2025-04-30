@@ -23,6 +23,15 @@ typedef struct vulkan_renderpass_t {
 } vulkan_renderpass_t;
 
 /* ======================== Vulkan Commandbuffer ============================ */
+typedef enum vulkan_combuff_state_t {
+    _STATE_READY,
+    _STATE_RECORDING,
+    _STATE_IN_RENDERPASS,
+    _STATE_RECORD_END,
+    _STATE_SUBMITTED,
+    _STATE_NOT_ALLOCATED
+} vulkan_combuff_state_t;
+
 typedef struct vulkan_framebuffer_t {
 	VkFramebuffer handle;
 	vulkan_renderpass_t *renderpass;
@@ -32,6 +41,7 @@ typedef struct vulkan_framebuffer_t {
 
 typedef struct vulkan_commandbuffer_t {
 	VkCommandBuffer handle;
+	vulkan_combuff_state_t state;
 } vulkan_commandbuffer_t;
 
 /* =========================== Vulkan Swapchain ============================= */
@@ -81,6 +91,8 @@ typedef struct vulkan_device_t {
 	int32_t graphic_idx;
 	int32_t present_idx;
 	int32_t transfer_idx;
+
+	b8 support_dev_local_host_vsb;
 } vulkan_device_t;
 
 /* ========================== Vulkan Pipeline =============================== */
@@ -88,6 +100,17 @@ typedef struct vulkan_pipeline_t {
 	VkPipeline handle;
 	VkPipelineLayout pipe_layout;
 } vulkan_pipeline_t;
+
+/* =========================== Vulkan Buffers =============================== */
+typedef struct vulkan_buffer_t {
+	uint64_t total_size;
+	VkBuffer handle;
+	VkBufferUsageFlagBits usage;
+	b8 is_locked;
+	VkDeviceMemory memory;
+	int32_t mem_idx;
+	uint32_t mem_prop_flag;
+} vulkan_buffer_t;
 
 /* =========================== Vulkan Shaders =============================== */
 typedef struct vulkan_shader_stage_t {
@@ -101,18 +124,17 @@ typedef struct vulkan_shader_stage_t {
 typedef struct vulkan_object_shader_t {
 	vulkan_shader_stage_t stages[OBJ_SHADER_STAGE_COUNT];
 	vulkan_pipeline_t pipeline;
-} vulkan_object_shader_t;
 
-/* =========================== Vulkan Buffers =============================== */
-typedef struct vulkan_buffer_t {
-	uint64_t total_size;
-	VkBuffer handle;
-	VkBufferUsageFlagBits usage;
-	b8 is_locked;
-	VkDeviceMemory memory;
-	int32_t mem_idx;
-	uint32_t mem_prop_flag;
-} vulkan_buffer_t;
+	VkDescriptorSetLayout global_desc_set_layout;
+	VkDescriptorPool global_desc_pool;
+	VkDescriptorSet global_desc_sets[4];
+
+	vulkan_buffer_t global_uni_buffer;
+
+	global_uni_obj_t global_ubo;
+
+	b8 desc_updated[4];
+} vulkan_object_shader_t;
 
 /* =========================== Vulkan Context =============================== */
 typedef struct vulkan_context_t {
