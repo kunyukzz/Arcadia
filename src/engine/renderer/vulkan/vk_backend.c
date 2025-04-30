@@ -16,6 +16,7 @@
 #include "engine/renderer/vulkan/vk_fence.h"
 #include "engine/renderer/vulkan/vk_result.h"
 #include "engine/renderer/vulkan/vk_buffer.h"
+#include "engine/renderer/vulkan/shaders/vk_obj_shader.h"
 
 // Shaders
 #include "engine/renderer/vulkan/shaders/vk_obj_shader.h"
@@ -29,6 +30,53 @@ static uint32_t cache_framebuffer_height = 0;
 
 /* ========================= PRIVATE FUNCTION =============================== */
 /* ========================================================================== */
+void upload_data(vulkan_context_t *ctx, VkCommandPool pool, VkFence fence,
+                 VkQueue queue, vulkan_buffer_t *buffer, uint64_t offset,
+                 uint64_t size, void *data) {
+    VkBufferUsageFlags flags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
+                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+    vulkan_buffer_t staging;
+    vk_buffer_init(ctx, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, flags, true,
+                   &staging);
+
+    vk_buffer_load_data(ctx, &staging, 0, size, 0, data);
+    vk_buffer_copy(ctx, pool, fence, queue, staging.handle, 0, buffer->handle,
+                   offset, size);
+    vk_buffer_shut(ctx, &staging);
+}
+
+void draw_triangle(vulkan_context_t *ctx, VkCommandPool *pool, VkQueue *queues) {
+#define VERT_COUNT 4
+	vertex_3d verts[VERT_COUNT];
+	memory_zero(verts, sizeof(vertex_3d) * VERT_COUNT);
+
+	const float f = 1.0f;
+
+	// Top Left
+	verts[0].position.x = -0.5f * f;
+	verts[0].position.y = -0.5f * f;
+
+	// Bottom Right
+	verts[1].position.x = 0.5f * f;
+	verts[1].position.y = 0.5f * f;
+
+	// Bottom Left
+	verts[2].position.x = -0.5f * f;
+	verts[2].position.y = 0.5f * f;
+
+	// Top Right
+	verts[3].position.x = 0.5f * f;
+	verts[3].position.y = -0.5f * f;
+	
+#define IDX_COUNT 6
+	uint32_t indices[IDX_COUNT] = {0, 1, 2, 0, 3, 1};
+
+    upload_data(ctx, *pool, 0, *queues, &ctx->obj_vert_buffer, 0,
+                sizeof(vertex_3d) * VERT_COUNT, verts);
+
+    upload_data(ctx, *pool, 0, *queues, &ctx->obj_idx_buffer, 0,
+                sizeof(uint32_t) * IDX_COUNT, indices);
+}
 
 int32_t find_mem_idx(uint32_t type_filter, uint32_t prop_flag) {
 	VkPhysicalDeviceMemoryProperties mem_prop;
@@ -129,7 +177,7 @@ b8 recreate_swapchain(render_backend_t *be) {
 	context.recreate_swap = true;
 	vkDeviceWaitIdle(context.device.logic_dev);
 
-	vk_image_view_shut(&context, &context.swapchain);
+	//vk_image_view_shut(&context, &context.swapchain);
 	//vk_image_shut(&context, &context.swapchain.image_attach);
 	vk_swapchain_reinit(&context, &context.swapchain);
 	
@@ -274,15 +322,18 @@ b8 vk_backend_init(render_backend_t *backend, const char *name) {
 
 	buffer_init(&context);
 
-    ar_DEBUG("Vulkan API Created Successfully");
+    ar_DEBUG("Vulkan API Granted Access Successfully");
 
 	/* this for clean up all the vulkan extensions */
 	dyn_array_destroy(extension);
 	dyn_array_destroy(validation);
 
-	//print_vulkan_structs();
-	
-	ar_INFO("Renderer System Initialized");
+    ar_INFO("Renderer System Initialized");
+
+	ar_INFO("--Test Drawing Triangle");
+    draw_triangle(&context, &context.device.graphics_command_pool,
+                  &context.device.graphics_queue);
+
 	return true;
 }
 
@@ -400,10 +451,11 @@ b8 vk_backend_begin_frame(render_backend_t *backend, float delta_time) {
             return false;
         }
 
-		if (!recreate_swapchain(backend))
-			return false;
+        if (!recreate_swapchain(backend)) {
+            return false;
+        }
 
-		ar_INFO("Resized Booting");
+        ar_INFO("Resized Booting");
 		return false;
 	}
 
@@ -433,9 +485,11 @@ b8 vk_backend_begin_frame(render_backend_t *backend, float delta_time) {
 	/* Begin Record Command */
     vulkan_commandbuffer_t *combuff =
         &context.graphic_comm_buffer[context.image_idx];
+	vk_combuff_reset(combuff);
     vk_combuff_begin(combuff);
 
     /* Viewport & Scissor */
+	/* This is was Dynamic Viewport */
 	VkViewport viewport = {};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
@@ -460,6 +514,45 @@ b8 vk_backend_begin_frame(render_backend_t *backend, float delta_time) {
 
     return true;
 }
+
+void vk_backend_update_global(mat4 projection, mat4 view, vec3 view_pos,
+                              vec4 ambient_color, int32_t mode) {
+	(void)view_pos;
+	(void)ambient_color;
+	(void)mode;
+	vk_obj_shader_use(&context, &context.obj_shader);
+	context.obj_shader.global_ubo.projection = projection;
+	context.obj_shader.global_ubo.viewx = view;
+
+	// TODO: other UBO properties
+	
+	vk_obj_shader_update_global_state(&context, &context.obj_shader);
+
+
+	// TODO: Temporary Code Test
+	vk_obj_shader_use(&context, &context.obj_shader);
+	VkDeviceSize offset[1] = {0};
+
+    vkCmdBindDescriptorSets(context.graphic_comm_buffer[context.image_idx].handle,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            context.obj_shader.pipeline.pipe_layout, 0, 1,
+                            &context.obj_shader
+                                 .global_desc_sets[context.image_idx],
+                            0, NULL);
+    // Bind vertex
+    vkCmdBindVertexBuffers(context.graphic_comm_buffer[context.image_idx].handle, 0, 1,
+                           &context.obj_vert_buffer.handle,
+                           (VkDeviceSize *)offset);
+    // Bind indices
+    vkCmdBindIndexBuffer(context.graphic_comm_buffer[context.image_idx].handle,
+                         context.obj_idx_buffer.handle, 0,
+                         VK_INDEX_TYPE_UINT32);
+	
+    // draw
+    vkCmdDrawIndexed(context.graphic_comm_buffer[context.image_idx].handle,
+                     IDX_COUNT, 1, 0, 0, 0);
+}
+
 
 b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
 	(void)backend;
@@ -503,6 +596,8 @@ b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
 		ar_ERROR("vkQueueSubmit error");
 		return false;
 	}
+
+	vk_combuff_update(combuff);
 
     vk_swapchain_present(&context, context.device.graphics_queue,
                          context.device.present_queue,

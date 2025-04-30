@@ -3,6 +3,8 @@
 #include "engine/core/logger.h"
 #include "engine/memory/memory.h"
 
+#include "engine/renderer/vulkan/vk_combuffer.h"
+
 #include <vulkan/vulkan_core.h>
 
 b8 vk_buffer_init(vulkan_context_t *ctx, uint64_t size,
@@ -124,8 +126,9 @@ void vk_buffer_bind(vulkan_context_t *ctx, vulkan_buffer_t *buffer,
 void *vk_buffer_lock_mem(vulkan_context_t *ctx, vulkan_buffer_t *buffer,
                          uint64_t offset, uint64_t size, uint32_t flag) {
 	void *data;
-	VK_CHECK(vkMapMemory(ctx->device.logic_dev, buffer->memory, offset, size, flag, &data));
-	return data;
+    VK_CHECK(vkMapMemory(ctx->device.logic_dev, buffer->memory, offset, size,
+                         flag, &data));
+    return data;
 }
 
 void  vk_buffer_unlock_mem(vulkan_context_t *ctx, vulkan_buffer_t *buffer) {
@@ -136,20 +139,21 @@ void  vk_buffer_load_data(vulkan_context_t *ctx, vulkan_buffer_t *buffer,
                           uint64_t offset, uint64_t size, uint32_t flag,
                           const void *data) {
 	void *data_ptr;
-	VK_CHECK(vkMapMemory(ctx->device.logic_dev, buffer->memory, offset, size, flag, &data_ptr));
-	memory_copy(data_ptr, data, size);
-	vkUnmapMemory(ctx->device.logic_dev, buffer->memory);
+    VK_CHECK(vkMapMemory(ctx->device.logic_dev, buffer->memory, offset, size,
+                         flag, &data_ptr));
+    memory_copy(data_ptr, data, size);
+    vkUnmapMemory(ctx->device.logic_dev, buffer->memory);
 }
 
 void  vk_buffer_copy(vulkan_context_t *ctx, VkCommandPool pool, VkFence fence,
                      VkQueue queue, VkBuffer source, uint64_t source_offset,
                      VkBuffer dest, uint64_t dest_offset, uint64_t size) {
-	(void)pool;
 	(void)fence;
 	vkQueueWaitIdle(queue);
 	vkDeviceWaitIdle(ctx->device.logic_dev);
 	
 	vulkan_commandbuffer_t temp;
+	vk_combuff_single_use_init(ctx, pool, &temp);
 
 	VkBufferCopy copy;
 	copy.srcOffset = source_offset;
@@ -157,6 +161,8 @@ void  vk_buffer_copy(vulkan_context_t *ctx, VkCommandPool pool, VkFence fence,
 	copy.size = size;
 
 	vkCmdCopyBuffer(temp.handle, source, dest, 1, &copy);
+
+	vk_combuff_single_use_shut(ctx, pool, &temp, queue);
 }
 
 

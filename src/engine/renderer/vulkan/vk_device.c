@@ -197,12 +197,14 @@ b8 select_phys_dev(vulkan_context_t *context) {
 		VkPhysicalDeviceMemoryProperties memory;
 		vkGetPhysicalDeviceMemoryProperties(phys_dev[i], &memory);
 
+		b8 support_dev_local_host_vsb = false;
 		for (uint32_t j = 0; j < memory.memoryTypeCount; ++j) {
 			if (
 				((memory.memoryTypes[j].propertyFlags &
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0) &&
 				((memory.memoryTypes[j].propertyFlags &
 				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0)) {
+				support_dev_local_host_vsb = true;
 				break;
 			}
 		}
@@ -269,8 +271,10 @@ b8 select_phys_dev(vulkan_context_t *context) {
 			context->device.properties = prop;
 			context->device.features = feats;
 			context->device.memory = memory;
-			break;
-		}
+            context->device.support_dev_local_host_vsb =
+                support_dev_local_host_vsb;
+            break;
+        }
     }
 
 
