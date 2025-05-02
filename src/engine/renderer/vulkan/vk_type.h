@@ -127,13 +127,13 @@ typedef struct vulkan_object_shader_t {
 
 	VkDescriptorSetLayout global_desc_set_layout;
 	VkDescriptorPool global_desc_pool;
-	VkDescriptorSet global_desc_sets[4];
+	VkDescriptorSet *global_desc_sets;
 
 	vulkan_buffer_t global_uni_buffer;
 
 	global_uni_obj_t global_ubo;
 
-	b8 desc_updated[4];
+	b8 *desc_updated;
 } vulkan_object_shader_t;
 
 /* =========================== Vulkan Context =============================== */

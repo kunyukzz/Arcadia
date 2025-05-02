@@ -1,7 +1,7 @@
 CC = clang
 STD = -std=c99
 INCLUDES = -I src -I$(VULKAN_SDK)/include
-WARNINGS = -Wall -Wextra -Wno-c23-extensions -Wshadow -Wpointer-arith 			\
+WARNINGS = -Wall -Wextra -Wno-c2x-extensions -Wshadow -Wpointer-arith 			\
 		   -Wcast-align -Wsign-conversion -Wno-error=uninitialized
 MEMORYS = -fsanitize=address -fno-omit-frame-pointer
 

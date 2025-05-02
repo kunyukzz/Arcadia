@@ -4,6 +4,7 @@
 #include "engine/renderer/vulkan/vk_shader_util.h"
 #include "engine/renderer/vulkan/vk_pipeline.h"
 
+#include "engine/container/dyn_array.h"
 #include "engine/core/logger.h"
 #include "engine/memory/memory.h"
 #include "engine/math/math_type.h"
@@ -89,8 +90,11 @@ b8   vk_obj_shader_init(vulkan_context_t *ctx, vulkan_object_shader_t *shader) {
 
 	/* Descriptor Set Layout */
 #define desc_set_layout_count 1
-    VkDescriptorSetLayout layouts[desc_set_layout_count] = {
-        shader->global_desc_set_layout};
+
+	VkDescriptorSetLayout* layouts = dyn_array_reserved(VkDescriptorSetLayout, ctx->swapchain.image_count);
+	for (uint32_t i = 0; i < ctx->swapchain.image_count; ++i) {
+		layouts[i] = shader->global_desc_set_layout;
+	}
 
     VkPipelineShaderStageCreateInfo stg_info[OBJ_SHADER_STAGE_COUNT];
 	memory_zero(stg_info, sizeof(stg_info));
@@ -125,24 +129,36 @@ b8   vk_obj_shader_init(vulkan_context_t *ctx, vulkan_object_shader_t *shader) {
         return false;
     }
 
-    VkDescriptorSetLayout global_layout[4] = {shader->global_desc_set_layout,
-                                              shader->global_desc_set_layout,
-                                              shader->global_desc_set_layout,
-                                              shader->global_desc_set_layout};
+	// TODO: THIS NEED TO REWRITE.
+	// Because it break on other machine if ImageView was more than 4!!
+	shader->global_desc_sets = dyn_array_reserved(VkDescriptorSet, ctx->swapchain.image_count);
+	shader->desc_updated = dyn_array_reserved(b8, ctx->swapchain.image_count);
+
+	for (uint32_t i = 0; i < ctx->swapchain.image_count; ++i) {
+		layouts[i] = shader->global_desc_set_layout;
+	}
+	
 
     VkDescriptorSetAllocateInfo alloc_info = {};
 	alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	alloc_info.descriptorPool = shader->global_desc_pool;
 	alloc_info.descriptorSetCount = ctx->swapchain.image_count;
-	alloc_info.pSetLayouts = global_layout;
+	alloc_info.pSetLayouts = layouts;
 
     VK_CHECK(vkAllocateDescriptorSets(ctx->device.logic_dev, &alloc_info,
                                       shader->global_desc_sets));
+
+	/* This was for destroyin the array value of global descriptor sets.*/
+	dyn_array_destroy(layouts);
 
     return true;
 }
 
 void vk_obj_shader_shut(vulkan_context_t *ctx, vulkan_object_shader_t *shader) {
+	/* This was for destroyin the array value of global descriptor sets.*/
+	dyn_array_destroy(shader->global_desc_sets);
+	dyn_array_destroy(shader->desc_updated);
+
 	/* Destroy uniform buffer */
 	vk_buffer_shut(ctx, &shader->global_uni_buffer);
 
