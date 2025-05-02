@@ -314,12 +314,14 @@ b8 vk_device_init(vulkan_context_t *context) {
 		indices[idx++] = (uint32_t)context->device.transfer_idx;
 
 	VkDeviceQueueCreateInfo q_infos[32];
+	float queue_prior[32];
+
 	for (uint32_t i = 0; i < idx_count; ++i) {
+		queue_prior[i] = 1.0f;
 		q_infos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 		q_infos[i].queueFamilyIndex = indices[i];
 		q_infos[i].queueCount = 1;
-		float q_prior = 1.0f;
-		q_infos[i].pQueuePriorities = &q_prior;
+		q_infos[i].pQueuePriorities = &queue_prior[i];
 	}
 
 	//TODO: implement this later
@@ -331,8 +333,8 @@ b8 vk_device_init(vulkan_context_t *context) {
 	create_info.pQueueCreateInfos = q_infos;
 	create_info.pEnabledFeatures = &dev_feats;
 	create_info.enabledExtensionCount = 1;
-	const char *ext_names = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
-	create_info.ppEnabledExtensionNames = &ext_names;
+	static const char *ext_names[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+	create_info.ppEnabledExtensionNames = ext_names;
 
 	/* Create Device */
 	VK_CHECK(vkCreateDevice(context->device.phys_dev, &create_info,
