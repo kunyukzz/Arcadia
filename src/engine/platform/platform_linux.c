@@ -17,6 +17,7 @@
 #define VK_USE_PLATFORM_XCB_KHR
 #include "engine/renderer/vulkan/vk_type.h"
 #include <vulkan/vulkan.h>
+#include <xcb/randr.h>
 
 #include <string.h>
 #include <stdlib.h>
@@ -37,6 +38,56 @@ typedef struct platform_state_t {
 static platform_state_t *p_state;
 
 keys translate_keycode(uint32_t x_keycode);
+
+/* Add implementation for considering multi monitor */
+b8 get_monitor_under_cursor(xcb_connection_t *conn, xcb_screen_t *screen,
+    int *x_out, int *y_out, uint32_t *width_out, uint32_t *height_out) {
+    if (!conn || !screen || !x_out || !y_out || !width_out || !height_out) {
+        return false;
+    }
+    
+    xcb_query_pointer_reply_t *pointer = xcb_query_pointer_reply(conn,
+        xcb_query_pointer(conn, screen->root), NULL);
+    if (!pointer) { return false;}
+    
+    int mouse_x = pointer->root_x;
+    int mouse_y = pointer->root_y;
+    free(pointer);
+    xcb_randr_get_screen_resources_reply_t *res =
+    xcb_randr_get_screen_resources_reply(conn,
+        xcb_randr_get_screen_resources(conn, screen->root), NULL);
+    if (!res) {
+        return false;
+    }
+
+    xcb_randr_crtc_t *crtcs = xcb_randr_get_screen_resources_crtcs(res);
+    for (int i = 0; i < res->num_crtcs; ++i) {
+        xcb_randr_get_crtc_info_reply_t *crtc_info =
+            xcb_randr_get_crtc_info_reply(conn,
+                xcb_randr_get_crtc_info(conn, crtcs[i], XCB_CURRENT_TIME), NULL);
+
+        if (crtc_info &&
+            mouse_x >= crtc_info->x &&
+            mouse_x < crtc_info->x + crtc_info->width &&
+            mouse_y >= crtc_info->y &&
+            mouse_y < crtc_info->y + crtc_info->height) {
+
+            *x_out = crtc_info->x;
+            *y_out = crtc_info->y;
+            *width_out = crtc_info->width;
+            *height_out = crtc_info->height;
+
+            free(crtc_info);
+            free(res);
+            return true;
+        }
+
+        free(crtc_info);
+    }
+
+    free(res);
+    return false;
+}
 
 b8 platform_init(uint64_t *memory_require, void *state, const char *name,
                  int32_t x, int32_t y, uint32_t w, uint32_t h) {
@@ -60,10 +111,16 @@ b8 platform_init(uint64_t *memory_require, void *state, const char *name,
 	uint32_t value_mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
 	uint32_t value_list[] = {p_state->screen->black_pixel, event_mask};
 
-	uint32_t screen_width = p_state->screen->width_in_pixels;
-	uint32_t screen_height = p_state->screen->height_in_pixels;
-	x = (screen_width - w) / 2;
-	y = (screen_height - h) / 2;
+    int mon_x, mon_y;
+    uint32_t mon_w, mon_h;
+    if (get_monitor_under_cursor(p_state->conn, p_state->screen, &mon_x, &mon_y, &mon_w, &mon_h)) {
+        x = mon_x + (int32_t)((mon_w - w) / 2);
+        y = mon_y + (int32_t)((mon_h - h) / 2);
+    } else {
+        // fallback to default screen centering
+        x = (p_state->screen->width_in_pixels - w) / 2;
+        y = (p_state->screen->height_in_pixels - h) / 2;
+    }
 
 	xcb_create_window(p_state->conn, XCB_COPY_FROM_PARENT, p_state->window,
                     p_state->screen->root, x, y, w, h, 0,
