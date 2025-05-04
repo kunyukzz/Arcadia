@@ -224,10 +224,15 @@ void vk_obj_shader_update_global_state(vulkan_context_t       *ctx,
                             shader->pipeline.pipe_layout, 0, 1, &global_desc, 0,
                             0);
 }
-/*
-void vk_obj_shader_update_obj(vulkan_context_t *ctx, vulkan_object_shader_t
-*shader, geo_render_data_t data);
-*/
+
+void vk_obj_shader_update_obj(vulkan_context_t       *ctx,
+                              vulkan_object_shader_t *shader, mat4 model) {
+    uint32_t        image_idx = ctx->image_idx;
+    VkCommandBuffer combuff = ctx->graphic_comm_buffer[image_idx].handle;
+
+    vkCmdPushConstants(combuff, shader->pipeline.pipe_layout,
+                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4), &model);
+}
 
 b8   vk_obj_shader_acquire_rsc(vulkan_context_t       *ctx,
                                vulkan_object_shader_t *shader, uint32_t *obj_id) {

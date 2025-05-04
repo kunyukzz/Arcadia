@@ -34,16 +34,10 @@ typedef _Bool b8;
 #endif
 
 // SIMD
-#ifdef _arsimd
-	#ifdef _MSC_VER
-		#define _aralignas __declspec(align(16))
-	#else
-		#define _aralignas __attribute__((aligned(16)))
-	#endif
-#endif //_arsimd
-
-#ifndef _aralignas
-	#define _aralignas
+#ifdef _MSC_VER
+	#define _aralignas __declspec(align(16))
+#else
+	#define _aralignas __attribute__((aligned(16)))
 #endif
 
 #endif //__DEFINE_H__

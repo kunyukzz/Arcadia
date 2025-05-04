@@ -50,7 +50,7 @@ void draw_triangle(vulkan_context_t *ctx, VkCommandPool *pool, VkQueue *queues) 
 	vertex_3d verts[VERT_COUNT];
 	memory_zero(verts, sizeof(vertex_3d) * VERT_COUNT);
 
-	const float f = 1.0f;
+	const float f = 5.0f;
 
 	// Top Left
 	verts[0].position.x = -0.5f * f;
@@ -527,30 +527,6 @@ void vk_backend_update_global(mat4 projection, mat4 view, vec3 view_pos,
 	// TODO: other UBO properties
 	
 	vk_obj_shader_update_global_state(&context, &context.obj_shader);
-
-
-	// TODO: Temporary Code Test
-	vk_obj_shader_use(&context, &context.obj_shader);
-	VkDeviceSize offset[1] = {0};
-
-    vkCmdBindDescriptorSets(context.graphic_comm_buffer[context.image_idx].handle,
-                            VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            context.obj_shader.pipeline.pipe_layout, 0, 1,
-                            &context.obj_shader
-                                 .global_desc_sets[context.image_idx],
-                            0, NULL);
-    // Bind vertex
-    vkCmdBindVertexBuffers(context.graphic_comm_buffer[context.image_idx].handle, 0, 1,
-                           &context.obj_vert_buffer.handle,
-                           (VkDeviceSize *)offset);
-    // Bind indices
-    vkCmdBindIndexBuffer(context.graphic_comm_buffer[context.image_idx].handle,
-                         context.obj_idx_buffer.handle, 0,
-                         VK_INDEX_TYPE_UINT32);
-	
-    // draw
-    vkCmdDrawIndexed(context.graphic_comm_buffer[context.image_idx].handle,
-                     IDX_COUNT, 1, 0, 0, 0);
 }
 
 
@@ -605,4 +581,33 @@ b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
                          context.image_idx, &context.swapchain);
 
     return true;
+}
+
+void vk_backend_update_obj(mat4 model) {
+	vk_obj_shader_update_obj(&context, &context.obj_shader, model);
+
+	// TODO: Temporary Code Test
+	vk_obj_shader_use(&context, &context.obj_shader);
+	VkDeviceSize offset[1] = {0};
+
+    vkCmdBindDescriptorSets(context.graphic_comm_buffer[context.image_idx]
+                                .handle,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            context.obj_shader.pipeline.pipe_layout, 0, 1,
+                            &context.obj_shader
+                                 .global_desc_sets[context.image_idx],
+                            0, NULL);
+    // Bind vertex
+    vkCmdBindVertexBuffers(context.graphic_comm_buffer[context.image_idx]
+                               .handle,
+                           0, 1, &context.obj_vert_buffer.handle,
+                           (VkDeviceSize *)offset);
+    // Bind indices
+    vkCmdBindIndexBuffer(context.graphic_comm_buffer[context.image_idx].handle,
+                         context.obj_idx_buffer.handle, 0,
+                         VK_INDEX_TYPE_UINT32);
+
+    // draw
+    vkCmdDrawIndexed(context.graphic_comm_buffer[context.image_idx].handle,
+                     IDX_COUNT, 1, 0, 0, 0);
 }

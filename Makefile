@@ -22,8 +22,11 @@ endif
 
 SRC = $(shell find src -type f -name '*.c')
 OBJ = $(patsubst src/%.c, $(OBJ_DIR)/%.o, $(SRC))
+DEP = $(OBJ:.o=.d)
 DIR = $(sort $(dir $(OBJ)))
 OUT = $(OUT_DIR)/rcadia
+
+-include $(DEP)
 
 # Detect OS
 OS := $(shell uname)
@@ -46,7 +49,7 @@ create_dir:
 	@mkdir -p $(DIR)
 
 clean:
-	@echo "Clean projects artifacts...$<"
+	@echo "Clean projects artifacts..."
 	@rm -rf $(OBJ_DIR) $(OUT_DIR)
 
 .PHONY: clean

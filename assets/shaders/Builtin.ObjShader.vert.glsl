@@ -11,8 +11,13 @@ layout(set = 0, binding = 0) uniform global_uni_obj {
 	mat4 view;
 } global_ubo;
 
+layout(push_constant) uniform push_constants {
+	mat4 model;
+} u_push_consts;
+
 void main() {
-	gl_Position = global_ubo.projection * global_ubo.view * vec4(in_pos, 1.0);
+	gl_Position = global_ubo.projection * global_ubo.view * u_push_consts.model
+		* vec4(in_pos, 1.0);
 	out_pos = in_pos;
 }
 
