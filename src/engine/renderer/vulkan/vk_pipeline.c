@@ -53,22 +53,22 @@ b8 vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
 	VkPipelineDepthStencilStateCreateInfo depth_stc_info = {};
     depth_stc_info.sType =
         VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depth_stc_info.depthTestEnable  = VK_TRUE;
-    depth_stc_info.depthWriteEnable = VK_TRUE;
-	depth_stc_info.depthCompareOp = VK_COMPARE_OP_LESS;
-	depth_stc_info.depthBoundsTestEnable = VK_FALSE;
-	depth_stc_info.stencilTestEnable = VK_FALSE;
+    depth_stc_info.depthTestEnable       = VK_TRUE;
+    depth_stc_info.depthWriteEnable      = VK_TRUE;
+    depth_stc_info.depthCompareOp        = VK_COMPARE_OP_LESS;
+    depth_stc_info.depthBoundsTestEnable = VK_FALSE;
+    depth_stc_info.stencilTestEnable     = VK_FALSE;
 
-	/* Color Blend */
+    /* Color Blend */
 	VkPipelineColorBlendAttachmentState blend_attach;
 	memory_zero(&blend_attach, sizeof(VkPipelineColorBlendAttachmentState));
-	blend_attach.blendEnable = VK_TRUE;
-	blend_attach.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	blend_attach.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	blend_attach.colorBlendOp = VK_BLEND_OP_ADD;
-	blend_attach.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	blend_attach.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	blend_attach.alphaBlendOp = VK_BLEND_OP_ADD;
+    blend_attach.blendEnable         = VK_TRUE;
+    blend_attach.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    blend_attach.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    blend_attach.colorBlendOp        = VK_BLEND_OP_ADD;
+    blend_attach.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    blend_attach.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    blend_attach.alphaBlendOp        = VK_BLEND_OP_ADD;
     blend_attach.colorWriteMask =
         VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -88,64 +88,73 @@ b8 vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
 	};
 
 	VkPipelineDynamicStateCreateInfo dyn_info = {};
-	dyn_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dyn_info.dynamicStateCount = 3;
-	dyn_info.pDynamicStates = dyn_state;
+    dyn_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dyn_info.dynamicStateCount = 3;
+    dyn_info.pDynamicStates    = dyn_state;
 
-	/* Vertex Input */
-	VkVertexInputBindingDescription bind_desc;
-	bind_desc.binding = 0;
-	bind_desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-	bind_desc.stride = sizeof(vertex_3d);
+    /* Vertex Input */
+    VkVertexInputBindingDescription bind_desc;
+    bind_desc.binding   = 0;
+    bind_desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    bind_desc.stride    = sizeof(vertex_3d);
 
-	/* Attributes */
-	VkPipelineVertexInputStateCreateInfo vert_info = {};
-	vert_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vert_info.vertexBindingDescriptionCount = 1;
-	vert_info.pVertexBindingDescriptions = &bind_desc;
-	vert_info.vertexAttributeDescriptionCount = attr_count;
-	vert_info.pVertexAttributeDescriptions = attr;
+    /* Attributes */
+    VkPipelineVertexInputStateCreateInfo vert_info = {};
+    vert_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vert_info.vertexBindingDescriptionCount         = 1;
+    vert_info.pVertexBindingDescriptions            = &bind_desc;
+    vert_info.vertexAttributeDescriptionCount       = attr_count;
+    vert_info.pVertexAttributeDescriptions          = attr;
 
-	/* Input Assembly */
-	VkPipelineInputAssemblyStateCreateInfo asm_info = {};
-	asm_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	asm_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	asm_info.primitiveRestartEnable = VK_FALSE;
+    /* Input Assembly */
+    VkPipelineInputAssemblyStateCreateInfo asm_info = {};
+    asm_info.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    asm_info.topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    asm_info.primitiveRestartEnable = VK_FALSE;
 
-	/* Pipeline Layout */
+    /* Pipeline Layout */
 	VkPipelineLayoutCreateInfo pipe_lay_info = {};
 	pipe_lay_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-	/* Descriptor Layout */
+	/* Push Constant */
+    VkPushConstantRange push_const = {};
+    push_const.stageFlags          = VK_SHADER_STAGE_VERTEX_BIT;
+    push_const.offset              = sizeof(mat4) * 0;
+    push_const.size                = sizeof(mat4) * 2;
+
+    /* Descriptor Layout */
 	pipe_lay_info.setLayoutCount = set_layout_count;
 	pipe_lay_info.pSetLayouts = set_layout;
+	pipe_lay_info.pushConstantRangeCount = 1;
+	pipe_lay_info.pPushConstantRanges = &push_const;
 
 	/* Create Pipeline Layout */
     VK_CHECK(vkCreatePipelineLayout(ctx->device.logic_dev, &pipe_lay_info,
                                     ctx->alloc, &pipeline->pipe_layout));
 
 	/* Create Pipeline */
-	VkGraphicsPipelineCreateInfo pipeline_info = {};
-	pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	pipeline_info.stageCount = stg_count;
-	pipeline_info.pStages = stg;
-	pipeline_info.pVertexInputState = &vert_info;
-	pipeline_info.pInputAssemblyState = &asm_info;
+    VkGraphicsPipelineCreateInfo pipeline_info = {};
+    pipeline_info.sType      = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipeline_info.stageCount = stg_count;
+    pipeline_info.pStages    = stg;
+    pipeline_info.pVertexInputState   = &vert_info;
+    pipeline_info.pInputAssemblyState = &asm_info;
 
-	pipeline_info.pViewportState = &vw_info;
-	pipeline_info.pRasterizationState = &raster_info;
-	pipeline_info.pMultisampleState = &mlt_info;
-	pipeline_info.pDepthStencilState = &depth_stc_info;
-	pipeline_info.pColorBlendState = &blend_info;
-	pipeline_info.pDynamicState = &dyn_info;
-	pipeline_info.pTessellationState = 0;
+    pipeline_info.pViewportState      = &vw_info;
+    pipeline_info.pRasterizationState = &raster_info;
+    pipeline_info.pMultisampleState   = &mlt_info;
+    pipeline_info.pDepthStencilState  = &depth_stc_info;
+    pipeline_info.pColorBlendState    = &blend_info;
+    pipeline_info.pDynamicState       = &dyn_info;
+    pipeline_info.pTessellationState  = 0;
 
-	pipeline_info.layout = pipeline->pipe_layout;
+    pipeline_info.layout              = pipeline->pipe_layout;
 
-	pipeline_info.renderPass = renderpass->handle;
-	pipeline_info.subpass = 0;
-	pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
-	pipeline_info.basePipelineIndex = -1;
+    pipeline_info.renderPass          = renderpass->handle;
+    pipeline_info.subpass             = 0;
+    pipeline_info.basePipelineHandle  = VK_NULL_HANDLE;
+    pipeline_info.basePipelineIndex   = -1;
 
     VkResult result =
         vkCreateGraphicsPipelines(ctx->device.logic_dev, VK_NULL_HANDLE, 1,

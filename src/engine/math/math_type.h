@@ -3,71 +3,33 @@
 
 #include "engine/define.h"
 
-typedef union uni_vec2 {
-    float elements[2];
-    struct {
-		// Default
-        float x, y;
-    };
-    struct {
-		// Color
-        float r, g;
-    };
-    struct {
-		// Texture Coordinate
-        float u, v;
-    };
+typedef union _aralignas {
+	struct { float x, y, _padz1, _padw1; };
+	struct { float r, g, _padz2, _padw2; } comp2;
+	struct { float u, v, _padz3, _padw3; } comp3;
+	float elements[4];
 } vec2;
 
-typedef union uni_vec3 {
-    float elements[3];
-    struct {
-		// Default
-        float x, y, z;
-    };
-    struct {
-		// Color
-        float r, g, b;
-    };
-    struct {
-		// Texture Coordinate
-        float u, v, w;
-    };
+typedef union _aralignas {
+    struct { float x, y, z, _pad1; };
+    struct { float r, g, b, _pad2; } comp2;
+    struct { float u, v, t, _pad3; } comp3;
+    float elements[4];
 } vec3;
 
-#if defined(_MSC_VER)
-	#include <intrin.h>
-#else
-	#include <xmmintrin.h>
-#endif
-
-typedef union uni_vec4 {
-#if defined(_arsimd)
-    _aralignas __m128 data;
-#endif
-    float elements[4];
-	struct {
-		// Default
-		float x, y, z, d;
-	};
-	struct {
-		// Color
-		float r, g, b, a;
-	};
-	struct {
-		// Texture Coordinate
-		float u, v, w, h;
-	};
+typedef union _aralignas {
+	struct { float x, y, z, w; };
+	struct { float r, g, b, a; } comp2;
+	struct { float u, v, t, s; } comp3;
+	float elements[4];
 } vec4;
 
-typedef vec4 quat;
-
-typedef union uni_mat4 {
-    _aralignas float data[16];
-#if defined(_arsimd)
-    _aralignas vec4 rows[4];
-#endif
+typedef union _aralignas {
+	float data[16];
+	vec4 rows[4];
 } mat4;
+
+typedef vec4 quat;
 
 typedef struct vertex_3d {
     vec3 position;

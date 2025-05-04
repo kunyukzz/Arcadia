@@ -69,14 +69,20 @@ void renderer_resize(uint32_t width, uint32_t height) {
 b8 renderer_draw_frame(render_packet_t *packet) {
 	if (renderer_begin_frame(packet->delta)) {
         mat4 projection = mat4_perspective(deg_to_rad(45.0f), 1280.0f / 720.0f,
-                                           0.1f, 1000.0f);
-		static float z = -1.0f;
-		z -= 0.05f;
-		mat4 view = mat4_translation( (vec3){ .x = 0.0f, .y = 0.0f, .z = z} );
-		//ar_INFO("view: %f", z);
+                                          0.1f, 1000.0f);
+		static float z = 0.0f;
+		z -= 0.01f;
+		mat4 view = mat4_translate((vec3){{0.0f, 0.0f, z}});
 
         p_state->backend.update_global(projection, view,
                                        vec3_zero(), vec4_one(), 0);
+
+		static float angle = 0.01f;
+		angle += 0.01f;
+		quat rotation = quat_from_axis_angle((vec3){{0.0f, 0.0f, 1.0f, 0.0f}}, angle, false);
+		mat4 model = quat_to_rotation_matrix(rotation, vec3_zero());
+		//mat4 model = mat4_translation((vec3){{0.0f, 0.0f, 0.0f}});
+		p_state->backend.update_obj(model);
 
 		b8 result = renderer_end_frame(packet->delta);
         if (!result) {

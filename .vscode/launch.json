@@ -9,15 +9,19 @@
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin/",
-            "environment": [],
+            "environment": [
+                { "name": "ASAN_OPTIONS", "value": "detect_leaks=1:abort_on_error=1" },
+                { "name": "LSAN_OPTIONS", "value": "detect_leaks=0" },
+                { "name": "LD_LIBRARY_PATH", "value": "/usr/lib/clang/19/lib/linux" }
+            ]
         },
         {
             "name": "(Windows) Launch",
-            "type": "cppvsdbg",
+            "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/rcadia.exe",
             "args": [],
-            "stopOnEntry": false,
+            "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin/",
             "console": "newExternalWindow",
         },
