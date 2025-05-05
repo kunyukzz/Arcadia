@@ -3,9 +3,6 @@
 set -e
 BUILD_TYPE=${1:-debug}
 
-echo "Clean previous build..."
-make clean
-
 echo "Building project ($BUILD_TYPE)..."
 if ! make BUILD=$BUILD_TYPE; then
 	echo "Build failed with erro code: $?"

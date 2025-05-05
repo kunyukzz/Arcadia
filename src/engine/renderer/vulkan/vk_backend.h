@@ -12,4 +12,6 @@ void vk_backend_update_global(mat4 projection, mat4 view, vec3 view_pos,
                               vec4 ambient_color, int32_t mode);
 b8   vk_backend_end_frame(render_backend_t *backend, float delta_time);
 
+void vk_backend_update_obj(mat4 model);
+
 #endif //__VULKAN_BACKEND_H__

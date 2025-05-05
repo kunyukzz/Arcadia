@@ -28,6 +28,7 @@ typedef struct render_backend_t {
     void (*update_global)(mat4 projection, mat4 viewx, vec3 view_pos,
                           vec4 ambient_color, int32_t mode);
     b8 (*end_frame)(struct render_backend_t *backend, float delta_time);
+	void (*update_obj)(mat4 model);
 
 } render_backend_t;
 
