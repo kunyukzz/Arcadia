@@ -230,7 +230,11 @@ b8 application_run(void) {
 		if (!p_state->is_suspend) {
 			time_update(&p_state->time);
 			double current_time = p_state->time.elapsed;
+
+			//float delta = (float)(current_time - p_state->last_time);
 			double delta = (current_time - p_state->last_time);
+			p_state->last_time = current_time;
+
 			double frame_start_time = get_absolute_time();
 
 			if (!p_state->game_inst->run(p_state->game_inst, (float)delta)) {
@@ -258,6 +262,7 @@ b8 application_run(void) {
 				uint64_t remain_ms = (remain_seconds * 1000);
 				b8 limit = false;
 				if (remain_ms > 0 && limit) {
+					//os_sleep(remain_ms);
 					os_sleep(remain_ms - 1);
 					ar_DEBUG("platform sleep");
 				}
@@ -266,9 +271,10 @@ b8 application_run(void) {
 
 			input_update(delta);
 			p_state->last_time = current_time;
+			
 
 			/* hahahahaa */
-			//ar_DEBUG("runtime: %f, frame_count: %u", runtime, frame_count);
+			//ar_TRACE("runtime: %f, frame_count: %u", runtime, frame_count);
 			(void)runtime;
 			(void)frame_count;
 		}

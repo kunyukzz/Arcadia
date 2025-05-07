@@ -4,11 +4,17 @@
 #include "engine/define.h"
 #include "engine/engine.h"
 
+#include "engine/math/math_type.h"
+
 /* this is bridge inside dummy test for engine.
  * so, engine can running */
 
 typedef struct game_state_t {
 	float delta_time;
+	mat4 view;
+	vec3 cam_pos;
+	vec3 cam_euler;
+	b8 cam_view_dirty;
 } game_state_t;
 
 b8 game_init(game_entry *game_inst);

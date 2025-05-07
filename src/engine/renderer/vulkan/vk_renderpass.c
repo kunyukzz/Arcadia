@@ -69,9 +69,10 @@ void vk_renderpass_init(vulkan_context_t    *ctx,
 void vk_renderpass_begin(vulkan_commandbuffer_t *combuff,
                          vulkan_renderpass_t    *renderpass,
                          VkFramebuffer           framebuffer) {
+	/* Set Background Color Value */
     VkClearValue clear_values[2];
     clear_values[0].color =
-        (VkClearColorValue){.float32 = {1.0f, 0.0f, 0.0f, 1.0f}};
+        (VkClearColorValue){.float32 = {0.28f, 0.24f, 0.54f, 1.0f}};
     clear_values[1].depthStencil =
         (VkClearDepthStencilValue){.depth = 1.0f, .stencil = 0};
 

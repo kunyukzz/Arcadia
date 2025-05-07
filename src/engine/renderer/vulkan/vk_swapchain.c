@@ -64,7 +64,6 @@ void vk_internal_swapchain(vulkan_context_t *ctx, vulkan_swapchain_t *swap,
 
     switch (present) {
     case VK_PRESENT_MODE_FIFO_KHR:
-
         ar_TRACE("Present Mode: VK_PRESENT_MODE_FIFO_KHR (V-Sync)");
         break;
     case VK_PRESENT_MODE_MAILBOX_KHR:
@@ -121,10 +120,12 @@ void vk_internal_swapchain(vulkan_context_t *ctx, vulkan_swapchain_t *swap,
                   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT,
                   &swap->image_attach);
+	/*
 	vk_image_view_from_image(ctx, &swap->image_attach,
                          ctx->device.depth_format,
                          VK_IMAGE_ASPECT_DEPTH_BIT,
                          &swap->image_attach.image_view);
+	*/
 
     ar_DEBUG("Vulkan Swapchain Created");
 }
@@ -284,6 +285,9 @@ void vk_image_init(vulkan_context_t *ctx, VkImageType img_type,
                               &image->memory));
     VK_CHECK(vkBindImageMemory(ctx->device.logic_dev, image->handle,
                                image->memory, 0));
+
+	vk_image_view_from_image(ctx, image, formats, aspects, &image->image_view);
+
 }
 
 void vk_image_view_from_image(vulkan_context_t *ctx, vulkan_image_t *image,
@@ -308,12 +312,6 @@ void vk_swapchain_shut(vulkan_context_t *ctx, vulkan_swapchain_t *swap) {
 	vk_image_view_shut(ctx, swap);
 	vk_image_shut(ctx, &swap->image_attach);
 
-	/*
-    for (uint32_t i = 0; i < swap->image_count; ++i) {
-        vkDestroyImageView(ctx->device.logic_dev, swap->image_view[i],
-                           ctx->alloc);
-    }
-	*/
     vkDestroyImageView(ctx->device.logic_dev, swap->image_attach.image_view,
                        ctx->alloc);
     vkDestroySwapchainKHR(ctx->device.logic_dev, swap->handle, ctx->alloc);

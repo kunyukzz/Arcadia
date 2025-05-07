@@ -14,6 +14,7 @@ static const char *memtag_string[MEMTAG_MAX_TAGS] = {
     "MEMTAG_APPLICATION",
     "MEMTAG_RENDERER",
     "MEMTAG_GAME",
+	"MEMTAG_TEXTURE",
     "MEMTAG_TRANSFORM",
     "MEMTAG_ENTITY",
     "MEMTAG_ENTITY_NODE",
@@ -63,9 +64,12 @@ void *memory_alloc_debug(uint64_t size, mem_tag_t tag, const char *file,
     p_state->alloc_count++;
   }
 
+  void *block = malloc(size);
+
+  /*
   void *block = 0;
   posix_memalign(&block, 16, size);
-  
+  */
   memory_set(block, 0, size);
 
   return block;

@@ -11,6 +11,7 @@
 
 #define true 1
 #define false 0
+#define INVALID_ID 4294967295u
 
 typedef _Bool b8;
 

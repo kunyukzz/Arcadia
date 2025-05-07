@@ -3,6 +3,7 @@
 
 #include "engine/define.h"
 #include <time.h>
+#include <unistd.h>
 
 typedef struct platform_time_t {
 	double start_time;
@@ -44,7 +45,7 @@ _arinline void time_start(platform_time_t *time) {
 
 _arinline void time_update(platform_time_t *time) {
 	if (time->start_time != 0)
-		time->elapsed = get_absolute_time() - time->elapsed;
+		time->elapsed = get_absolute_time() - time->start_time;
 }
 
 _arinline void time_sleep(platform_time_t *time) {

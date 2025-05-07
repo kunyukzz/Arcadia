@@ -15,6 +15,9 @@ b8 renderer_be_init(render_backend_type_t type, render_backend_t *backend) {
 		backend->resize = vk_backend_resize;
 		backend->shut = vk_backend_shut;
 		backend->update_obj = vk_backend_update_obj;
+
+		backend->init_tex = vk_backend_tex_init;
+		backend->shut_tex = vk_backend_tex_shut;
 		return true;
 	}
 	return false;
@@ -33,4 +36,7 @@ void renderer_be_shut(render_backend_t *backend) {
 	backend->resize = 0;
 	backend->shut = 0;
 	backend->update_obj = 0;
+
+	backend->init_tex = 0;
+	backend->shut_tex = 0;
 }

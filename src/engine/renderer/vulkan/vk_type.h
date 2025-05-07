@@ -120,20 +120,37 @@ typedef struct vulkan_shader_stage_t {
 } vulkan_shader_stage_t;
 
 #define OBJ_SHADER_STAGE_COUNT 2
+#define VULKAN_SHADER_DESC_COUNT 2
+#define VULKAN_MAX_OBJ_COUNT 1024
+
+typedef struct vulkan_desc_state_t {
+	uint32_t gen[4];
+} vulkan_desc_state_t;
+
+typedef struct vulkan_shader_obj_state_t {
+	VkDescriptorSet desc_sets[4];
+	vulkan_desc_state_t desc_states[VULKAN_SHADER_DESC_COUNT];
+} vulkan_shader_obj_state_t;
 
 typedef struct vulkan_object_shader_t {
 	vulkan_shader_stage_t stages[OBJ_SHADER_STAGE_COUNT];
 	vulkan_pipeline_t pipeline;
+	vulkan_buffer_t global_uni_buffer;
+	vulkan_buffer_t obj_uni_buffer;
+	vulkan_shader_obj_state_t obj_states[VULKAN_MAX_OBJ_COUNT];
 
 	VkDescriptorSetLayout global_desc_set_layout;
 	VkDescriptorPool global_desc_pool;
-	VkDescriptorSet *global_desc_sets;
+	VkDescriptorSet global_desc_sets[4]; // TODO: configure this using dynamic
+										 // array
 
-	vulkan_buffer_t global_uni_buffer;
+	VkDescriptorSetLayout obj_desc_set_layout;
+	VkDescriptorPool obj_desc_pool;
 
 	global_uni_obj_t global_ubo;
 
-	b8 *desc_updated;
+	uint32_t obj_uniform_buffer_idx;
+	b8 desc_updated[4]; // TODO: configure this using dynamic array
 } vulkan_object_shader_t;
 
 /* =========================== Vulkan Context =============================== */
@@ -178,5 +195,9 @@ typedef struct vulkan_context_t {
 	int32_t (*find_mem_idx)(uint32_t type_filter, uint32_t prop_flag);
 } vulkan_context_t;
 
+typedef struct vulkan_texture_data_t {
+	vulkan_image_t image;
+	VkSampler sampler;
+} vulkan_texture_data_t;
 
 #endif //__VULKAN_TYPE_H__
