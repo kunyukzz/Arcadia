@@ -49,20 +49,6 @@ _arinline b8   is_power_of_2(uint64_t value) {
 _arinline float deg_to_rad(float degree) { return degree * _ar_DEG2RAD; }
 _arinline float rad_to_deg(float rad) { return rad * _ar_RAD2DEG; }
 
-// for now only works on SSE1 version (portable for Windows or Linux)
-// portable for SSE2
-#define _AR_USE_SIMD true
-
-_arapi vec3 svec3_add(vec3 v1, vec3 v2);
-_arapi vec3 svec3_sub(vec3 v1, vec3 v2);
-_arapi vec3 svec3_multi(vec3 v1, vec3 v2);
-_arapi vec3 svec3_divide(vec3 v1, vec3 v2);
-_arapi vec3 svec3_multi_scalar(vec3 v, float s);
-_arapi float svec3_length_square(vec3 v);
-_arapi float svec3_length(vec3 v);
-_arapi float svec3_dot(vec3 v1, vec3 v2);
-_arapi vec3 svec3_cross(vec3 v1, vec3 v2);
-
 /* ========================= VECTOR OPERATION =============================== */
 /* ========================================================================== */
 
@@ -113,6 +99,24 @@ _arinline float vec2_distance(vec2 v1, vec2 v2) {
 }
 
 /* ============================== VECTOR 3 ================================== */
+/* Vector3 has 2 ways implementation. using scalar operation and using SIMD
+ * for now, SIMD only works on SSE1 but portable for Windows or Linux.
+ * and i think conpatible with SSE2 also
+ */
+#define _AR_USE_SIMD true
+
+_arapi vec3 svec3_add(vec3 v1, vec3 v2);
+_arapi vec3 svec3_sub(vec3 v1, vec3 v2);
+_arapi vec3 svec3_multi(vec3 v1, vec3 v2);
+_arapi vec3 svec3_divide(vec3 v1, vec3 v2);
+_arapi vec3 svec3_multi_scalar(vec3 v, float s);
+_arapi float svec3_length_square(vec3 v);
+_arapi float svec3_length(vec3 v);
+_arapi float svec3_dot(vec3 v1, vec3 v2);
+_arapi vec3 svec3_cross(vec3 v1, vec3 v2);
+_arapi void svec3_normalized(vec3 *v);
+_arapi vec3 svec3_get_normalized(vec3 v);
+
 _arinline vec3 vec3_create(float x, float y, float z) {
     return (vec3){.x = x, .y = y, .z = z};
 }
@@ -178,6 +182,21 @@ _arinline vec3 vec3_get_normalized(vec3 v) {
 _arinline float vec3_distance(vec3 v1, vec3 v2) {
 	vec3 dist = (vec3){.x = v1.x - v2.x, .y = v1.y - v2.y, .z = v1.z - v2.z};
 	return vec3_length(dist);
+}
+
+_arinline b8 vec3_compared(vec3 v1, vec3 v2, float tolerance) {
+	if (_ar_absf(v1.x - v2.x) > tolerance) {
+		return false;
+	}
+
+	if (_ar_absf(v1.y - v2.y) > tolerance) {
+		return false;
+	}
+
+	if (_ar_absf(v1.z - v2.z) > tolerance) {
+		return false;
+	}
+	return true;
 }
 
 /* ============================== VECTOR 4 ================================== */
@@ -607,63 +626,107 @@ _arinline mat4 mat4_transpose(mat4 matrix) {
     return result;
 }
 
-// i got this from stack overflow
-// https://stackoverflow.com/questions/1148309/inverting-a-4x4-matrix
-static inline float invf(int i, int j, const float *m) {
-    int o = 2 + (j - i);
+_arinline mat4 mat4_inverse(mat4 matrix) {
+    const float *m   = matrix.data;
+    float        t0  = m[10] * m[15];
+    float        t1  = m[14] * m[11];
+    float        t2  = m[6] * m[15];
+    float        t3  = m[14] * m[7];
+    float        t4  = m[6] * m[11];
+    float        t5  = m[10] * m[7];
+    float        t6  = m[2] * m[15];
+    float        t7  = m[14] * m[3];
+    float        t8  = m[2] * m[11];
+    float        t9  = m[10] * m[3];
+    float        t10 = m[2] * m[7];
+    float        t11 = m[6] * m[3];
+    float        t12 = m[8] * m[13];
+    float        t13 = m[12] * m[9];
+    float        t14 = m[4] * m[13];
+    float        t15 = m[12] * m[5];
+    float        t16 = m[4] * m[9];
+    float        t17 = m[8] * m[5];
+    float        t18 = m[0] * m[13];
+    float        t19 = m[12] * m[1];
+    float        t20 = m[0] * m[9];
+    float        t21 = m[8] * m[1];
+    float        t22 = m[0] * m[5];
+    float        t23 = m[4] * m[1];
 
-    i += 4 + o;
-    j += 4 - o;
-
-#define e(a, b) m[((j + b) % 4) * 4 + ((i + a) % 4)]
-
-    float inv =
-        +e(+1, -1) * e(+0, +0) * e(-1, +1) + e(+1, +1) * e(+0, -1) * e(-1, +0) +
-        e(-1, -1) * e(+1, +0) * e(+0, +1) - e(-1, -1) * e(+0, +0) * e(+1, +1) -
-        e(-1, +1) * e(+0, -1) * e(+1, +0) - e(+1, -1) * e(-1, +0) * e(+0, +1);
-
-    return (o % 2) ? inv : -inv;
-#undef e
-}
-
-static inline float mat4_determinant(const float *m) {
-    float det = 0.0f;
-
-    for (int j = 0; j < 4; ++j) {
-        det += (j % 2 == 0 ? 1.0f : -1.0f) * m[j] * invf(0, j, m);
-    }
-
-    return det;
-}
-
-_arinline mat4 mat4_inverse(const float *m) {
-    float det = mat4_determinant(m);
-
-    if (_ar_absf(det) < 0.0f) {
-        return mat4_identity();
-    }
     mat4 result;
+	float *o = result.data;
+
+    o[0] = (t0 * m[5] + t3 * m[9] + t4 * m[13]) -
+           (t1 * m[5] + t2 * m[9] + t5 * m[13]);
+
+    o[1] = (t1 * m[1] + t6 * m[9] + t9 * m[13]) -
+           (t0 * m[1] + t7 * m[9] + t8 * m[13]);
+
+    o[2] = (t2 * m[1] + t7 * m[5] + t10 * m[13]) -
+           (t3 * m[1] + t6 * m[5] + t11 * m[13]);
+
+    o[3] = (t5 * m[1] + t8 * m[5] + t11 * m[9]) -
+           (t4 * m[1] + t9 * m[5] + t10 * m[9]);
 
 #ifdef AR_USE_COLUMN_MAJOR
-	for (int i = 0; i < 4; ++i) {
-		for (int j = 0; j < 4; ++j) {
-			result.data[i * 4 + j] = invf(i, j, m);
-		}
-	}
+    float d = 1.0f / (m[0] * o[0] + m[4] * o[1] + m[8] * o[2] + m[12] * o[3]);
+
+    o[0]    = d * o[0];
+    o[1]    = d * o[1];
+    o[2]    = d * o[2];
+    o[3]    = d * o[3];
+
+    o[4]    = d * ((t1 * m[4] + t2 * m[8] + t5 * m[12]) -
+                (t0 * m[4] + t3 * m[8] + t4 * m[12]));
+	
+    o[5]    = d * ((t0 * m[0] + t7 * m[8] + t8 * m[12]) -
+                (t1 * m[0] + t6 * m[8] + t9 * m[12]));
+
+    o[6]    = d * ((t3 * m[0] + t6 * m[4] + t11 * m[12]) -
+                (t2 * m[0] + t7 * m[4] + t10 * m[12]));
+
+    o[7]    = d * ((t4 * m[0] + t9 * m[4] + t10 * m[8]) -
+                (t5 * m[0] + t8 * m[4] + t11 * m[8]));
+
+    o[8]    = d * ((t12 * m[7] + t15 * m[11] + t16 * m[15]) -
+                (t13 * m[7] + t14 * m[11] + t17 * m[15]));
+
+    o[9]    = d * ((t13 * m[3] + t18 * m[11] + t21 * m[15]) -
+                (t12 * m[3] + t19 * m[11] + t20 * m[15]));
+
+    o[10]   = d * ((t14 * m[3] + t19 * m[7] + t22 * m[15]) -
+                 (t15 * m[3] + t18 * m[7] + t23 * m[15]));
+
+    o[11]   = d * ((t17 * m[3] + t20 * m[7] + t23 * m[11]) -
+                 (t16 * m[3] + t21 * m[7] + t22 * m[11]));
+
+    o[12]   = d * ((t14 * m[10] + t17 * m[14] + t13 * m[6]) -
+                 (t16 * m[14] + t12 * m[6] + t15 * m[10]));
+	
+    o[13]   = d * ((t20 * m[14] + t12 * m[2] + t19 * m[10]) -
+                 (t18 * m[10] + t21 * m[14] + t13 * m[2]));
+
+    o[14]   = d * ((t18 * m[6] + t23 * m[14] + t15 * m[2]) -
+                 (t22 * m[14] + t14 * m[2] + t19 * m[6]));
+
+    o[15]   = d * ((t22 * m[10] + t16 * m[2] + t21 * m[6]) -
+                 (t20 * m[6] + t23 * m[10] + t17 * m[2]));
 
 #elif defined(AR_USE_ROW_MAJOR)
-    for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 4; ++j) {
-            result.data[j * 4 + i] = invf(i, j, m);
-        }
-    }
+	float d = 1.0f / (m[0] * o[0] + m[1] * o[4] + m[2] * o[8] + m[3] * o[12]);
+	for (int i = 0; i < 16; ++i) o[i] *= d;
+
+#define SWAP(a, b) { float tmp = a; a = b; b = tmp; }
+	SWAP(o[1], o[4]);
+    SWAP(o[2], o[8]);
+    SWAP(o[3], o[12]);
+    SWAP(o[6], o[9]);
+    SWAP(o[7], o[13]);
+    SWAP(o[11], o[14]);
+#undef SWAP
 #else
 #error "Matrix layout not defined. Select either COLUMN or ROW MAJOR."
 #endif
-
-    for (int i = 0; i < 16; ++i) {
-        result.data[i] /= det;
-    }
 
     return result;
 }

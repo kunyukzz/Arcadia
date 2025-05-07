@@ -16,6 +16,7 @@
 #include "engine/renderer/vulkan/vk_fence.h"
 #include "engine/renderer/vulkan/vk_result.h"
 #include "engine/renderer/vulkan/vk_buffer.h"
+#include "engine/renderer/vulkan/vk_image.h"
 #include "engine/renderer/vulkan/shaders/vk_obj_shader.h"
 
 // Shaders
@@ -50,23 +51,30 @@ void draw_triangle(vulkan_context_t *ctx, VkCommandPool *pool, VkQueue *queues) 
 	vertex_3d verts[VERT_COUNT];
 	memory_zero(verts, sizeof(vertex_3d) * VERT_COUNT);
 
-	const float f = 5.0f;
+	const float f = 10.0f;
 
 	// Top Left
 	verts[0].position.x = -0.5f * f;
 	verts[0].position.y = -0.5f * f;
+	verts[0].texcoord.x = 0.0f;
+	verts[0].texcoord.y = 0.0f;
 
 	// Bottom Right
 	verts[1].position.x = 0.5f * f;
 	verts[1].position.y = 0.5f * f;
+	verts[1].texcoord.x = 1.0f;
+	verts[1].texcoord.y = 1.0f;
 
 	// Bottom Left
 	verts[2].position.x = -0.5f * f;
 	verts[2].position.y = 0.5f * f;
+	verts[2].texcoord.x = 0.0f;
+	verts[2].texcoord.y = 1.0f;
 
 	// Top Right
 	verts[3].position.x = 0.5f * f;
 	verts[3].position.y = -0.5f * f;
+	verts[3].texcoord.x = 1.0f;
 	
 #define IDX_COUNT 6
 	uint32_t indices[IDX_COUNT] = {0, 1, 2, 0, 3, 1};
@@ -76,6 +84,7 @@ void draw_triangle(vulkan_context_t *ctx, VkCommandPool *pool, VkQueue *queues) 
 
     upload_data(ctx, *pool, 0, *queues, &ctx->obj_idx_buffer, 0,
                 sizeof(uint32_t) * IDX_COUNT, indices);
+
 }
 
 int32_t find_mem_idx(uint32_t type_filter, uint32_t prop_flag) {
@@ -322,6 +331,16 @@ b8 vk_backend_init(render_backend_t *backend, const char *name) {
 
 	buffer_init(&context);
 
+	ar_INFO("--Test Drawing Triangle");
+    draw_triangle(&context, &context.device.graphics_command_pool,
+                  &context.device.graphics_queue);
+
+	uint32_t obj_id = 0;
+	if (!vk_obj_shader_acquire_rsc(&context, &context.obj_shader, &obj_id)) {
+		ar_ERROR("Failed to acquire shader resources");
+		return false;
+	}
+
     ar_DEBUG("Vulkan API Granted Access Successfully");
 
 	/* this for clean up all the vulkan extensions */
@@ -329,11 +348,6 @@ b8 vk_backend_init(render_backend_t *backend, const char *name) {
 	dyn_array_destroy(validation);
 
     ar_INFO("Renderer System Initialized");
-
-	ar_INFO("--Test Drawing Triangle");
-    draw_triangle(&context, &context.device.graphics_command_pool,
-                  &context.device.graphics_queue);
-
 	return true;
 }
 
@@ -525,14 +539,14 @@ void vk_backend_update_global(mat4 projection, mat4 view, vec3 view_pos,
 	context.obj_shader.global_ubo.viewx = view;
 
 	// TODO: other UBO properties
-	
-	vk_obj_shader_update_global_state(&context, &context.obj_shader);
-}
 
+    vk_obj_shader_update_global_state(&context, &context.obj_shader,
+                                      context.frame_delta);
+}
 
 b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
 	(void)backend;
-	(void)delta_time;
+	context.frame_delta = delta_time;
 
     vulkan_commandbuffer_t *combuff =
         &context.graphic_comm_buffer[context.image_idx];
@@ -583,8 +597,8 @@ b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
     return true;
 }
 
-void vk_backend_update_obj(mat4 model) {
-	vk_obj_shader_update_obj(&context, &context.obj_shader, model);
+void vk_backend_update_obj(geo_render_data_t data) {
+	vk_obj_shader_update_obj(&context, &context.obj_shader, data);
 
 	// TODO: Temporary Code Test
 	vk_obj_shader_use(&context, &context.obj_shader);
@@ -611,3 +625,113 @@ void vk_backend_update_obj(mat4 model) {
     vkCmdDrawIndexed(context.graphic_comm_buffer[context.image_idx].handle,
                      IDX_COUNT, 1, 0, 0, 0);
 }
+
+void vk_backend_tex_init(const char *name, b8 auto_release, int32_t width,
+                         int32_t height, int32_t channel_count,
+                         const uint8_t *pixel, b8 has_transparent,
+                         texture_t *texture) {
+	(void)name;
+	(void)auto_release;
+	texture->width = (uint32_t)width;
+	texture->height = (uint32_t)height;
+	texture->channel_count = channel_count;
+	texture->gen = INVALID_ID;
+
+	// TODO: use an allocator
+    texture->interal_data =
+        (vulkan_texture_data_t *)memory_alloc(sizeof(vulkan_texture_data_t),
+                                              MEMTAG_TEXTURE);
+    vulkan_texture_data_t *data =
+        (vulkan_texture_data_t *)texture->interal_data;
+	VkDeviceSize image_size = (uint64_t)width * (uint64_t)height * (uint64_t)channel_count;
+
+	// NOTE: assume 8-bit per channel.
+	VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
+
+	/* Create staging buffer & load data */
+	VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    VkMemoryPropertyFlags mem_prop_flag = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    vulkan_buffer_t staging;
+    vk_buffer_init(&context, image_size, usage, mem_prop_flag, true, &staging);
+	vk_buffer_load_data(&context, &staging, 0, image_size, 0, pixel);
+
+    vk_image_init(&context, VK_IMAGE_TYPE_2D, image_format,
+                  VK_IMAGE_TILING_OPTIMAL, (uint32_t)width, (uint32_t)height,
+                  VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                      VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                      VK_IMAGE_USAGE_SAMPLED_BIT |
+                      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                  mem_prop_flag, VK_IMAGE_ASPECT_COLOR_BIT, &data->image);
+
+    vulkan_commandbuffer_t temp_buff;
+	VkCommandPool pool = context.device.graphics_command_pool;
+	VkQueue queue = context.device.graphics_queue;
+	vk_combuff_single_use_init(&context, pool, &temp_buff);
+
+	/* Transition current layout to optimal for receive data */
+    vk_image_transition_layout(&context, &temp_buff, &data->image,
+                               &image_format, VK_IMAGE_LAYOUT_UNDEFINED,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+	/* Copy data from framebuffer */
+	vk_image_copy_buffer(&context, &data->image, staging.handle, &temp_buff);
+
+    /* Transition from optimal data receive to shader read-only optimal layout */
+    vk_image_transition_layout(&context, &temp_buff, &data->image,
+                               &image_format,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vk_combuff_single_use_shut(&context, pool, &temp_buff, queue);
+
+	vk_buffer_shut(&context, &staging);
+
+    /* Create sampler for texture */
+	VkSamplerCreateInfo sampler_info = {};
+	sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	sampler_info.magFilter = VK_FILTER_LINEAR;
+	sampler_info.minFilter = VK_FILTER_LINEAR;
+
+	sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+	sampler_info.anisotropyEnable = VK_FALSE;
+
+	sampler_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	sampler_info.unnormalizedCoordinates = VK_FALSE;
+	sampler_info.compareEnable = VK_FALSE;
+	sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
+	sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+	sampler_info.mipLodBias = 0;
+	sampler_info.minLod = 0;
+	sampler_info.maxLod = 0;
+
+    VkResult result = vkCreateSampler(context.device.logic_dev, &sampler_info,
+                                      context.alloc, &data->sampler);
+    if (!vk_result_is_success(VK_SUCCESS)) {
+        ar_ERROR("Error creating texture sampler: %s",
+                 vk_result_string(result, true));
+        return;
+    }
+
+	texture->has_transparent = has_transparent;
+	texture->gen++;
+}
+
+void vk_backend_tex_shut(texture_t *texture) {
+	vkDeviceWaitIdle(context.device.logic_dev);
+
+	vulkan_texture_data_t *data = (vulkan_texture_data_t *)texture->interal_data;
+
+	vk_image_shut(&context, &data->image);
+	memory_zero(&data->image, sizeof(vulkan_image_t));
+
+	vkDestroySampler(context.device.logic_dev, data->sampler, context.alloc);
+	data->sampler = 0;
+
+	memory_free(texture->interal_data, sizeof(vulkan_texture_data_t), MEMTAG_TEXTURE);
+	memory_zero(texture, sizeof(texture_t));
+}
+

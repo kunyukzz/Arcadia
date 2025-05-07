@@ -159,7 +159,7 @@ float svec3_length_square(vec3 v) {
 }
 
 float svec3_length(vec3 v) {
-	return	_ar_sqrtf(vec3_length_square(v));
+	return	_ar_sqrtf(svec3_length_square(v));
 }
 
 float svec3_dot(vec3 v1, vec3 v2) {
@@ -195,7 +195,26 @@ vec3 svec3_cross(vec3 v1, vec3 v2) {
 	return out;
 }
 
+void svec3_normalized(vec3 *v) {
+    __m128 va = _vec_load(v, sizeof(*v));
+    __m128 dot = _mm_mul_ps(va, va);
 
+    __m128 shuf1 = _mm_shuffle_ps(dot, dot, _MM_SHUFFLE(srcZ, srcY, srcX, srcW));
+    __m128 sum   = _mm_add_ps(dot, shuf1);
+    __m128 shuf2 = _mm_movehl_ps(sum, sum);
+    __m128 length_sq = _mm_add_ss(sum, shuf2);
+
+    __m128 length = _mm_sqrt_ss(length_sq);
+    length = _mm_shuffle_ps(length, length, _MM_SHUFFLE(0, 0, 0, 0));
+
+    __m128 result = _mm_div_ps(va, length);
+    _vec_store(v, result, sizeof(*v));
+}
+
+vec3 svec3_get_normalized(vec3 v) {
+    svec3_normalized(&v);
+    return v;
+}
 
 
 

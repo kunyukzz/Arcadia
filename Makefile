@@ -28,7 +28,7 @@ OUT = $(OUT_DIR)/rcadia
 
 -include $(DEP)
 
-# Detect OS
+# Detect OS\
 OS := $(shell uname)
 ifeq ($(OS), Windows_NT)
     CFLAGS += -DWIN32
@@ -50,6 +50,7 @@ create_dir:
 
 clean:
 	@echo "Clean projects artifacts..."
-	@rm -rf $(OBJ_DIR) $(OUT_DIR)
+	@rm -rf $(OBJ_DIR)
+	@rm -f $(OUT)
 
 .PHONY: clean
