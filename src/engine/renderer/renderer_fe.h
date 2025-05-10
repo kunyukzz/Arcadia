@@ -10,7 +10,7 @@ void renderer_resize(uint32_t width, uint32_t height);
 b8 renderer_draw_frame(render_packet_t *packet);
 void renderer_set_view(mat4 view);
 
-void renderer_tex_init(const char *name, b8 auto_release, int32_t width,
+void renderer_tex_init(const char *name, int32_t width,
                        int32_t height, int32_t channel_count,
                        const uint8_t *pixel, b8 has_transparent,
                        texture_t *texture);

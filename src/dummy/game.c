@@ -2,6 +2,7 @@
 
 #include "engine/core/logger.h"
 #include "engine/core/input.h"
+#include "engine/core/event.h"
 #include "engine/memory/memory.h"
 
 // NOTE: should not available outside engine.
@@ -10,13 +11,15 @@
 
 void recalc_view_matrix(game_state_t *p_state) {
     if (p_state->cam_view_dirty) {
-		mat4 rotation = mat4_euler_xyz(p_state->cam_euler.x, p_state->cam_euler.y, p_state->cam_euler.z);
-		mat4 translate = mat4_translate(p_state->cam_pos);
+        mat4 rotation =
+            mat4_euler_xyz(p_state->cam_euler.x, p_state->cam_euler.y,
+                           p_state->cam_euler.z);
+        mat4 translate          = mat4_translate(p_state->cam_pos);
 
-		//p_state->view = mat4_multi(translate, rotation);
-		p_state->view = mat4_multi(rotation, translate);
-		p_state->view = mat4_inverse(p_state->view);
-		
+        // p_state->view = mat4_multi(translate, rotation);
+        p_state->view           = mat4_multi(rotation, translate);
+        p_state->view           = mat4_inverse(p_state->view);
+
         p_state->cam_view_dirty = false;
     }
 }
@@ -52,15 +55,23 @@ b8 game_run(game_entry *game_inst, float delta_time) {
 
 	static uint64_t alloc_count = 0;
 	uint64_t prev_alloc_count = alloc_count;
-	
-	if (input_keyup('M') && input_was_keydown('M')) {
-		ar_DEBUG("Allocs: %llu (%llu this frame)", alloc_count, alloc_count - prev_alloc_count);
+
+    if (input_keyup('M') && input_was_keydown('M')) {
+        ar_DEBUG("Allocs: %llu (%llu this frame)", alloc_count,
+                 alloc_count - prev_alloc_count);
+    }
+
+    // TODO: Temporary
+	if (input_keyup('T') && input_was_keydown('T')) {
+		ar_DEBUG("Switch Texture");
+		event_context_t ev = {0};
+		event_push(EVENT_CODE_DEBUG0, 0, ev);
 	}
 
 	game_state_t *p_state = (game_state_t *)game_inst->state;
 
 	// movement camera
-	float gg = 0.05f;
+	float gg = 0.01f;
     if (input_keydown('Q') || input_keydown(KEY_LEFT)) {
         cam_yaw(p_state, gg * delta_time);
 	}
@@ -102,10 +113,10 @@ b8 game_run(game_entry *game_inst, float delta_time) {
     }
 
     if (input_keydown('Z')) {
-        velo.y += 0.05f;
+        velo.y += 0.01f;
 	}
     if (input_keydown('X')) {
-        velo.y -= 0.05f;
+        velo.y -= 0.01f;
 	}
 
     vec3 z = vec3_zero();

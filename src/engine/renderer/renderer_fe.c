@@ -3,8 +3,12 @@
 
 #include "engine/core/logger.h"
 #include "engine/math/maths.h"
-
 #include "engine/resources/resc_type.h"
+#include "engine/systems/texture_sys.h"
+
+// TODO: Temporary
+//#include "engine/core/strings.h"
+#include "engine/core/event.h"
 
 typedef struct render_state_t {
 	render_backend_t backend;
@@ -12,16 +16,45 @@ typedef struct render_state_t {
 	mat4 view;
 	float near, far;
 
-	texture_t default_texture;
+	texture_t *test_diffuse; 	// TODO: Temporary
 } render_state_t;
 
 static render_state_t *p_state;
+
+// TODO: Temporary
+b8 event_on_debug(uint16_t code, void *sender, void *listener, event_context_t data) {
+	(void)code;
+	(void)sender;
+	(void)listener;
+	(void)data;
+	const char *names[3] = {
+		"cobblestone",
+		"paving",
+		"paving2"
+	};
+	static int8_t choice = 2;
+	//
+	// save the old name
+	const char *old = names[choice];
+	choice++;
+	choice %= 3;
+
+	// acquire new texture
+	p_state->test_diffuse = texture_sys_acquire(names[choice], true);
+
+	// release old texture
+	texture_sys_release(old);
+	return true;
+}
 
 b8 renderer_init(uint64_t *memory_require, void *state, const char *name) {
 	*memory_require = sizeof(render_state_t);
 	if (state == 0)
 		return true;
 	p_state = state;
+
+	// TODO: Temporary
+	event_reg(EVENT_CODE_DEBUG0, p_state, event_on_debug);
 
 	renderer_be_init(BACKEND_VULKAN, &p_state->backend);
 	p_state->backend.frame_number = 0;
@@ -38,44 +71,15 @@ b8 renderer_init(uint64_t *memory_require, void *state, const char *name) {
     p_state->view       = mat4_translate((vec3){.x = 0.0f, 0.0f, -30.0f, 0.0f});
     p_state->view       = mat4_inverse(p_state->view);
 
-	/* default texture. 256x256 */
-	ar_TRACE("Create Default Texture...");
-	const uint32_t tex_dimension = 256;
-	const uint32_t channels = 4; 
-	const uint32_t pixel_count = tex_dimension * tex_dimension;
-	uint8_t pixels[pixel_count * channels];
-
-	// each pixel
-	for (uint64_t row = 0; row < tex_dimension; ++row) {
-		for (uint64_t col = 0; col < tex_dimension; ++col) {
-			uint64_t idx = (row * tex_dimension) + col;
-			uint64_t channel_idx = idx * channels;
-
-			uint8_t checker = ((row / 32) % 2) ^ ((col / 32) % 2); // 32px squares
-			if (checker) {
-				pixels[channel_idx + 0] = 255; 	// R
-				pixels[channel_idx + 1] = 0; 	// G
-				pixels[channel_idx + 2] = 255; 	// B
-				pixels[channel_idx + 3] = 255; 	// A
-			} else {
-				pixels[channel_idx + 0] = 0;
-				pixels[channel_idx + 1] = 0;
-				pixels[channel_idx + 2] = 0;
-				pixels[channel_idx + 3] = 255;
-			}
-		}
-	}
-
-    renderer_tex_init("Default", false, tex_dimension, tex_dimension, 4, pixels,
-                      false, &p_state->default_texture);
-
-    return true;
+	return true;
 }
 
 void renderer_shut(void *state) {
 	(void)state;
 	if (p_state) {
-		renderer_tex_shut(&p_state->default_texture);
+		// TODO: Temporary
+		event_unreg(EVENT_CODE_DEBUG0, p_state, event_on_debug);
+
 		p_state->backend.shut(&p_state->backend);
 	}
 
@@ -116,18 +120,25 @@ b8 renderer_draw_frame(render_packet_t *packet) {
         p_state->backend.update_global(p_state->projection, p_state->view,
                                        vec3_zero(), vec4_one(), 0);
 		
+		/*
         static float angle = 0.01f;
 		angle += 0.002f;
         quat rotation =
             quat_from_axis_angle((vec3){.x = 0.0f, 0.0f, 1.0f, 0.0f}, angle,
                                  false);
         mat4 model = quat_to_rotation_matrix(rotation, vec3_zero());
+		*/
 
-		//t4 model = mat4_translate(vec3_zero());
+		mat4 model = mat4_translate(vec3_zero());
 		geo_render_data_t data = {};
 		data.obj_id = 0;
 		data.model = model;
-		data.textures[0] = &p_state->default_texture;
+
+		if (!p_state->test_diffuse) {
+			p_state->test_diffuse = texture_sys_get_default_tex();
+		}
+
+		data.textures[0] = p_state->test_diffuse;
         p_state->backend.update_obj(data);
 
 		b8 result = renderer_end_frame(packet->delta);
@@ -143,11 +154,11 @@ void renderer_set_view(mat4 view) {
 	p_state->view = view;
 }
 
-void renderer_tex_init(const char *name, b8 auto_release, int32_t width,
+void renderer_tex_init(const char *name, int32_t width,
                        int32_t height, int32_t channel_count,
                        const uint8_t *pixel, b8 has_transparent,
                        texture_t *texture) {
-    p_state->backend.init_tex(name, auto_release, width, height,
+    p_state->backend.init_tex(name, width, height,
                                 channel_count, pixel, has_transparent, texture);
 }
 

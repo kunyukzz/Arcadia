@@ -9,6 +9,10 @@
 #include <stdarg.h>
 #include <string.h>
 
+#ifndef _MSC_VER
+#include <strings.h>
+#endif
+
 static inline uint64_t string_length(const char *str) {
 	return strlen(str);
 }
@@ -24,6 +28,13 @@ static inline b8 string_equal(const char *str1, const char *str2) {
 	return strcmp(str1, str2);
 }
 
+_arinline b8 string_equali(const char *str1, const char *str2) {
+#if defined(__GNUC__)
+	return strcasecmp(str1, str2) == 0;
+#elif define(_MSC_VER)
+	return _strcmpi(str1, str2) == 0;
+#endif
+}
 
 static inline int32_t string_format_v(char *dest, const char *format, void *va_lispt) {
 	if (dest) {

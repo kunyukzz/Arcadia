@@ -32,6 +32,7 @@ typedef struct geo_render_data_t {
 
 typedef struct render_backend_t {
 	uint64_t frame_number;
+	texture_t *default_diffuse;
 
 	b8 (*init)(struct render_backend_t *backend, const char *name);
 	void (*shut)(struct render_backend_t *backend);
@@ -44,7 +45,7 @@ typedef struct render_backend_t {
     b8 (*end_frame)(struct render_backend_t *backend, float delta_time);
 	void (*update_obj)(geo_render_data_t data);
 
-    void (*init_tex)(const char *name, b8 auto_release, int32_t width,
+    void (*init_tex)(const char *name, int32_t width,
                        int32_t height, int32_t channel_count,
                        const uint8_t *pixel, b8 has_transparent,
                        texture_t *texture);
