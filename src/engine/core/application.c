@@ -231,6 +231,7 @@ b8 application_run(void) {
 	double runtime = 0;
 	uint8_t frame_count = 0;
 	float target_frame_seconds = 1.0f / 60;
+	const b8 limit = true;
 
 	char *stats = memory_debug_stats();
 	ar_INFO(stats);
@@ -244,10 +245,9 @@ b8 application_run(void) {
 			time_update(&p_state->time);
 			double current_time = p_state->time.elapsed;
 
-			//float delta = (float)(current_time - p_state->last_time);
-			double delta = (current_time - p_state->last_time);
+			float delta = (float)(current_time - p_state->last_time);
+			//double delta = (current_time - p_state->last_time);
 			p_state->last_time = current_time;
-
 			double frame_start_time = get_absolute_time();
 
 			if (!p_state->game_inst->run(p_state->game_inst, (float)delta)) {
@@ -267,27 +267,40 @@ b8 application_run(void) {
 			renderer_draw_frame(&packet);
 
 			/* calculate how long frame took */
+			/*
 			double frame_end_time = get_absolute_time();
 			double frame_elapsed_time = frame_end_time - frame_start_time;
 			runtime += frame_elapsed_time;
 			double remain_seconds = target_frame_seconds - frame_elapsed_time;
+			
 			if (remain_seconds > 0) {
 				uint64_t remain_ms = (remain_seconds * 1000);
-				b8 limit = false;
+				b8 limit = true;
 				if (remain_ms > 0 && limit) {
-					//os_sleep(remain_ms);
-					os_sleep(remain_ms - 1);
-					ar_DEBUG("platform sleep");
+					os_sleep(remain_ms);
+					//os_sleep(remain_ms - 1);
+					//ar_DEBUG("platform sleep");
+					ar_TRACE("sleeping for %llu ms", remain_ms);
 				}
 				frame_count++;
 			}
+			*/
+
+			double next_frame_time = frame_start_time + target_frame_seconds;
+			double frame_end_time = get_absolute_time();
+			double frame_elapsed_time = frame_end_time - frame_start_time;
+			runtime += frame_elapsed_time;
+
+			if (limit && frame_end_time < next_frame_time) {
+				os_sleep(next_frame_time);
+				ar_TRACE("abs sleep until %.6f (%.3fms remain)", next_frame_time, (next_frame_time - frame_end_time) * 1000.0);
+			}
+			frame_count++;
 
 			input_update(delta);
-			p_state->last_time = current_time;
-			
 
 			/* hahahahaa */
-			//ar_TRACE("runtime: %f, frame_count: %u", runtime, frame_count);
+			ar_TRACE("runtime: %f, frame_count: %u", runtime, frame_count);
 			(void)runtime;
 			(void)frame_count;
 		}

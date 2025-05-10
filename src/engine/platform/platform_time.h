@@ -13,34 +13,19 @@ typedef struct platform_time_t {
 _arinline double get_absolute_time(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec + ts.tv_nsec / 1e9;
-
-	/*
-    static LARGE_INTEGER frequency;
-    static BOOL initialized = FALSE;
-    LARGE_INTEGER counter;
-
-    if (!initialized) {
-        QueryPerformanceFrequency(&frequency);
-        initialized = TRUE;
-    }
-
-    QueryPerformanceCounter(&counter);
-    return (double)counter.QuadPart / (double)frequency.QuadPart;
-	*/
-
-    return 0;
+    return (double)ts.tv_sec + (double)ts.tv_nsec / 1e9;
 }
 
-_arinline void os_sleep(uint64_t ms) {
+_arinline void os_sleep(double wake_time) {
 	struct timespec ts;
-	ts.tv_sec = ms / 1000;
-	ts.tv_nsec = (ms % 1000) * 1000 * 1000;
+	ts.tv_sec = (time_t)wake_time;
+	ts.tv_nsec = (long)((wake_time - ts.tv_sec) * 1e9);
+    clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, NULL);
 }
 
 _arinline void time_start(platform_time_t *time) {
 	time->start_time = get_absolute_time();
-	time->elapsed = 0;
+	time->elapsed = 0.0;
 }
 
 _arinline void time_update(platform_time_t *time) {
