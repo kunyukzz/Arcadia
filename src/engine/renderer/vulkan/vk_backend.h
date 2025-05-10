@@ -15,7 +15,7 @@ b8   vk_backend_end_frame(render_backend_t *backend, float delta_time);
 
 void vk_backend_update_obj(geo_render_data_t data);
 
-void vk_backend_tex_init(const char *name, b8 auto_release, int32_t width,
+void vk_backend_tex_init(const char *name, int32_t width,
                          int32_t height, int32_t channel_count,
                          const uint8_t *pixel, b8 has_transparent,
                          texture_t *texture);

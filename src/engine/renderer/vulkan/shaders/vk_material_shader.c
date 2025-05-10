@@ -1,29 +1,31 @@
-#include "engine/renderer/vulkan/shaders/vk_obj_shader.h"
+#include "engine/renderer/vulkan/shaders/vk_material_shader.h"
 
 #include "engine/define.h"
 #include "engine/renderer/vulkan/vk_buffer.h"
 #include "engine/renderer/vulkan/vk_shader_util.h"
 #include "engine/renderer/vulkan/vk_pipeline.h"
+#include "engine/systems/texture_sys.h"
 
-#include "engine/container/dyn_array.h"
+//#include "engine/container/dyn_array.h"
 #include "engine/core/logger.h"
 #include "engine/memory/memory.h"
 #include "engine/math/math_type.h"
 #include "engine/math/maths.h"
 #include <vulkan/vulkan_core.h>
 
-#define BUILTIN_SHADER_OBJ "Builtin.ObjShader"
+#define BUILTIN_MATERIAL_SHADER "Builtin.MaterialShader"
 
-b8   vk_obj_shader_init(vulkan_context_t *ctx, vulkan_object_shader_t *shader) {
+b8 vk_material_shader_init(vulkan_context_t         *ctx,
+                           vulkan_material_shader_t *shader) {
     char stg_type_str[OBJ_SHADER_STAGE_COUNT][5] = {"vert", "frag"};
     VkShaderStageFlagBits stg_type[OBJ_SHADER_STAGE_COUNT] =
         {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
 
     for (uint32_t i = 0; i < OBJ_SHADER_STAGE_COUNT; ++i) {
-        if (!vk_shader_module_init(ctx, BUILTIN_SHADER_OBJ, stg_type_str[i],
+        if (!vk_shader_module_init(ctx, BUILTIN_MATERIAL_SHADER, stg_type_str[i],
                                    stg_type[i], i, shader->stages)) {
             ar_ERROR("Unable to create %s shader module for '%s'.",
-                     stg_type_str[i], BUILTIN_SHADER_OBJ);
+                     stg_type_str[i], BUILTIN_MATERIAL_SHADER);
             return false;
         }
     }
@@ -197,7 +199,7 @@ b8   vk_obj_shader_init(vulkan_context_t *ctx, vulkan_object_shader_t *shader) {
     return true;
 }
 
-void vk_obj_shader_shut(vulkan_context_t *ctx, vulkan_object_shader_t *shader) {
+void vk_material_shader_shut(vulkan_context_t *ctx, vulkan_material_shader_t *shader) {
 	/* This was for destroyin the array value of global descriptor sets.*/
     vkDestroyDescriptorPool(ctx->device.logic_dev, shader->obj_desc_pool,
                             ctx->alloc);
@@ -226,14 +228,14 @@ void vk_obj_shader_shut(vulkan_context_t *ctx, vulkan_object_shader_t *shader) {
     }
 }
 
-void vk_obj_shader_use(vulkan_context_t *ctx, vulkan_object_shader_t *shader) {
+void vk_material_shader_use(vulkan_context_t *ctx, vulkan_material_shader_t *shader) {
 	uint32_t image_idx = ctx->image_idx;
     vk_pipeline_bind(&ctx->graphic_comm_buffer[image_idx],
                      VK_PIPELINE_BIND_POINT_GRAPHICS, &shader->pipeline);
 }
 
-void vk_obj_shader_update_global_state(vulkan_context_t       *ctx,
-                                       vulkan_object_shader_t *shader,
+void vk_material_shader_update_global_state(vulkan_context_t       *ctx,
+                                       vulkan_material_shader_t *shader,
                                        float                   delta_time) {
 	(void)delta_time;
     uint32_t image_idx = ctx->image_idx;
@@ -274,8 +276,8 @@ void vk_obj_shader_update_global_state(vulkan_context_t       *ctx,
                             0);
 }
 
-void vk_obj_shader_update_obj(vulkan_context_t       *ctx,
-                              vulkan_object_shader_t *shader, geo_render_data_t data) {
+void vk_material_shader_update_obj(vulkan_context_t       *ctx,
+                              vulkan_material_shader_t *shader, geo_render_data_t data) {
     uint32_t        image_idx = ctx->image_idx;
     VkCommandBuffer combuff = ctx->graphic_comm_buffer[image_idx].handle;
 
@@ -297,10 +299,12 @@ void vk_obj_shader_update_obj(vulkan_context_t       *ctx,
 	local_uni_obj_t obo;
 
 	//TODO: get diffuse color
+	/*
 	static float accum = 0.0f;
     accum += ctx->frame_delta;
     float s = _ar_sinf(accum) + 1.0f;
-    obo.diffuse_col = vec4_create(s, 1.0f, 1.0f, 1.0f);
+	*/
+    obo.diffuse_col = vec4_create(1.0f, 1.0f, 1.0f, 1.0f);
 
 	// load data to buffer
 	vk_buffer_load_data(ctx, &shader->obj_uni_buffer, offset, range, 0, &obo);
@@ -333,14 +337,22 @@ void vk_obj_shader_update_obj(vulkan_context_t       *ctx,
 	for (uint32_t sampler_idx = 0; sampler_idx < sampler_count; ++sampler_idx) {
 		texture_t *tt = data.textures[sampler_idx];
 		uint32_t *desc_gen = &obj_state->desc_states[desc_idx].gen[image_idx];
+		uint32_t *desc_id = &obj_state->desc_states[desc_idx].id[image_idx];
 
-		if (tt && (*desc_gen != tt->gen || *desc_gen == INVALID_ID)) {
-			vulkan_texture_data_t *internal_data = (vulkan_texture_data_t *)tt->interal_data;
+		if (tt->gen == INVALID_ID) {
+			tt = texture_sys_get_default_tex();
+			*desc_gen = INVALID_ID;
+		}
 
-			// Assign View and Samplers.
-			img_info[sampler_idx].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			img_info[sampler_idx].imageView = internal_data->image.image_view;
-			img_info[sampler_idx].sampler = internal_data->sampler;
+		if (tt && (*desc_id != tt->id || *desc_gen != tt->gen || *desc_gen == INVALID_ID)) {
+            vulkan_texture_data_t *internal_data =
+                (vulkan_texture_data_t *)tt->interal_data;
+
+            // Assign View and Samplers.
+            img_info[sampler_idx].imageLayout =
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            img_info[sampler_idx].imageView = internal_data->image.image_view;
+            img_info[sampler_idx].sampler = internal_data->sampler;
 
 			VkWriteDescriptorSet descript = {};
 			descript.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -356,6 +368,7 @@ void vk_obj_shader_update_obj(vulkan_context_t       *ctx,
 			// Sync frame gen if not using default texture.
 			if (tt->gen != INVALID_ID) {
 				*desc_gen = tt->gen;
+				*desc_id = tt->id;
 			}
 			desc_idx++;
 		}
@@ -373,8 +386,8 @@ void vk_obj_shader_update_obj(vulkan_context_t       *ctx,
                             0, 0);
 }
 
-b8 vk_obj_shader_acquire_rsc(vulkan_context_t       *ctx,
-                             vulkan_object_shader_t *shader, uint32_t *obj_id) {
+b8 vk_material_shader_acquire_rsc(vulkan_context_t       *ctx,
+                             vulkan_material_shader_t *shader, uint32_t *obj_id) {
     *obj_id = shader->obj_uniform_buffer_idx;
     shader->obj_uniform_buffer_idx++;
 
@@ -383,6 +396,7 @@ b8 vk_obj_shader_acquire_rsc(vulkan_context_t       *ctx,
     for (uint32_t i = 0; i < VULKAN_SHADER_DESC_COUNT; ++i) {
         for (uint32_t j = 0; j < 4; ++j) {
             obj_state->desc_states[i].gen[j] = INVALID_ID;
+			obj_state->desc_states[i].id[j] = INVALID_ID;
         }
     }
 
@@ -409,8 +423,8 @@ b8 vk_obj_shader_acquire_rsc(vulkan_context_t       *ctx,
     return true;
 }
 
-void vk_obj_shader_release_rsc(vulkan_context_t       *ctx,
-                               vulkan_object_shader_t *shader,
+void vk_material_shader_release_rsc(vulkan_context_t       *ctx,
+                               vulkan_material_shader_t *shader,
                                uint32_t               obj_id) {
     vulkan_shader_obj_state_t *obj_states     = &shader->obj_states[obj_id];
     const uint32_t             desc_set_count = 4;
@@ -425,6 +439,7 @@ void vk_obj_shader_release_rsc(vulkan_context_t       *ctx,
     for (uint32_t i = 0; i < VULKAN_SHADER_DESC_COUNT; ++i) {
         for (uint32_t j = 0; j < 4; ++j) {
             obj_states->desc_states[i].gen[j] = INVALID_ID;
+			obj_states->desc_states[i].id[j] = INVALID_ID;
         }
     }
 }

@@ -37,6 +37,8 @@ typedef enum event_code_t {
     EVENT_CODE_RESIZED          = 0x08, // resize window
 	EVENT_CODE_APP_SUSPEND      = 0x09, // New internal event for suspend
     EVENT_CODE_APP_RESUME       = 0x0A, // New internal event for resume
+	
+	EVENT_CODE_DEBUG0 			= 0x10, // Debug purpose
     MAX_EVENT_CODE              = 0xFF
 } event_code_t;
 

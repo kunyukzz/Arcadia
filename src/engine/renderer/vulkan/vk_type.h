@@ -125,6 +125,7 @@ typedef struct vulkan_shader_stage_t {
 
 typedef struct vulkan_desc_state_t {
 	uint32_t gen[4];
+	uint32_t id[4];
 } vulkan_desc_state_t;
 
 typedef struct vulkan_shader_obj_state_t {
@@ -132,7 +133,7 @@ typedef struct vulkan_shader_obj_state_t {
 	vulkan_desc_state_t desc_states[VULKAN_SHADER_DESC_COUNT];
 } vulkan_shader_obj_state_t;
 
-typedef struct vulkan_object_shader_t {
+typedef struct vulkan_material_shader_t {
 	vulkan_shader_stage_t stages[OBJ_SHADER_STAGE_COUNT];
 	vulkan_pipeline_t pipeline;
 	vulkan_buffer_t global_uni_buffer;
@@ -151,7 +152,7 @@ typedef struct vulkan_object_shader_t {
 
 	uint32_t obj_uniform_buffer_idx;
 	b8 desc_updated[4]; // TODO: configure this using dynamic array
-} vulkan_object_shader_t;
+} vulkan_material_shader_t;
 
 /* =========================== Vulkan Context =============================== */
 typedef struct vulkan_context_t {
@@ -190,7 +191,7 @@ typedef struct vulkan_context_t {
 	uint32_t current_frame;
 
 	b8 recreate_swap;
-	vulkan_object_shader_t obj_shader;
+	vulkan_material_shader_t obj_shader;
 
 	int32_t (*find_mem_idx)(uint32_t type_filter, uint32_t prop_flag);
 } vulkan_context_t;

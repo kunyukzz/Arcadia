@@ -17,10 +17,9 @@
 #include "engine/renderer/vulkan/vk_result.h"
 #include "engine/renderer/vulkan/vk_buffer.h"
 #include "engine/renderer/vulkan/vk_image.h"
-#include "engine/renderer/vulkan/shaders/vk_obj_shader.h"
 
 // Shaders
-#include "engine/renderer/vulkan/shaders/vk_obj_shader.h"
+#include "engine/renderer/vulkan/shaders/vk_material_shader.h"
 
 #include <vulkan/vulkan_core.h>
 
@@ -324,7 +323,7 @@ b8 vk_backend_init(render_backend_t *backend, const char *name) {
         context.image_in_flight[i] = 0;
     }
 
-    if (!vk_obj_shader_init(&context, &context.obj_shader)) {
+    if (!vk_material_shader_init(&context, &context.obj_shader)) {
 		ar_ERROR("Error loading Builtin shader");
 		return false;
 	}
@@ -336,7 +335,7 @@ b8 vk_backend_init(render_backend_t *backend, const char *name) {
                   &context.device.graphics_queue);
 
 	uint32_t obj_id = 0;
-	if (!vk_obj_shader_acquire_rsc(&context, &context.obj_shader, &obj_id)) {
+	if (!vk_material_shader_acquire_rsc(&context, &context.obj_shader, &obj_id)) {
 		ar_ERROR("Failed to acquire shader resources");
 		return false;
 	}
@@ -361,7 +360,7 @@ void vk_backend_shut(render_backend_t *backend) {
 	vk_buffer_shut(&context, &context.obj_vert_buffer);
 
 	ar_DEBUG("Kill Vulkan Object Shaders");
-	vk_obj_shader_shut(&context, &context.obj_shader);
+	vk_material_shader_shut(&context, &context.obj_shader);
 
     for (uint8_t i = 0; i < context.swapchain.max_frame_in_flight; ++i) {
         if (context.avail_semaphore[i]) {
@@ -534,13 +533,13 @@ void vk_backend_update_global(mat4 projection, mat4 view, vec3 view_pos,
 	(void)view_pos;
 	(void)ambient_color;
 	(void)mode;
-	vk_obj_shader_use(&context, &context.obj_shader);
+	vk_material_shader_use(&context, &context.obj_shader);
 	context.obj_shader.global_ubo.projection = projection;
 	context.obj_shader.global_ubo.viewx = view;
 
 	// TODO: other UBO properties
 
-    vk_obj_shader_update_global_state(&context, &context.obj_shader,
+    vk_material_shader_update_global_state(&context, &context.obj_shader,
                                       context.frame_delta);
 }
 
@@ -598,10 +597,10 @@ b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
 }
 
 void vk_backend_update_obj(geo_render_data_t data) {
-	vk_obj_shader_update_obj(&context, &context.obj_shader, data);
+	vk_material_shader_update_obj(&context, &context.obj_shader, data);
 
 	// TODO: Temporary Code Test
-	vk_obj_shader_use(&context, &context.obj_shader);
+	vk_material_shader_use(&context, &context.obj_shader);
 	VkDeviceSize offset[1] = {0};
 
     vkCmdBindDescriptorSets(context.graphic_comm_buffer[context.image_idx]
@@ -626,12 +625,11 @@ void vk_backend_update_obj(geo_render_data_t data) {
                      IDX_COUNT, 1, 0, 0, 0);
 }
 
-void vk_backend_tex_init(const char *name, b8 auto_release, int32_t width,
+void vk_backend_tex_init(const char *name, int32_t width,
                          int32_t height, int32_t channel_count,
                          const uint8_t *pixel, b8 has_transparent,
                          texture_t *texture) {
 	(void)name;
-	(void)auto_release;
 	texture->width = (uint32_t)width;
 	texture->height = (uint32_t)height;
 	texture->channel_count = channel_count;
@@ -721,17 +719,21 @@ void vk_backend_tex_init(const char *name, b8 auto_release, int32_t width,
 }
 
 void vk_backend_tex_shut(texture_t *texture) {
-	vkDeviceWaitIdle(context.device.logic_dev);
+    vkDeviceWaitIdle(context.device.logic_dev);
 
-	vulkan_texture_data_t *data = (vulkan_texture_data_t *)texture->interal_data;
+    vulkan_texture_data_t *data =
+        (vulkan_texture_data_t *)texture->interal_data;
 
-	vk_image_shut(&context, &data->image);
-	memory_zero(&data->image, sizeof(vulkan_image_t));
+    if (data) {
+        vk_image_shut(&context, &data->image);
+        memory_zero(&data->image, sizeof(vulkan_image_t));
 
-	vkDestroySampler(context.device.logic_dev, data->sampler, context.alloc);
-	data->sampler = 0;
+        vkDestroySampler(context.device.logic_dev, data->sampler,
+                         context.alloc);
+        data->sampler = 0;
+        memory_free(texture->interal_data, sizeof(vulkan_texture_data_t),
+                    MEMTAG_TEXTURE);
+    }
 
-	memory_free(texture->interal_data, sizeof(vulkan_texture_data_t), MEMTAG_TEXTURE);
-	memory_zero(texture, sizeof(texture_t));
+    memory_zero(texture, sizeof(texture_t));
 }
-

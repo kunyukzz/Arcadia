@@ -14,6 +14,8 @@
 
 #include "engine/renderer/renderer_fe.h"
 
+#include "engine/systems/texture_sys.h"
+
 typedef struct subsys_state_t {
 	uint64_t size;
 	void *state;
@@ -37,6 +39,7 @@ typedef struct application_state_t {
 	subsys_state_t input;
 	subsys_state_t platform;
 	subsys_state_t renderer;
+	subsys_state_t textures;
 
 } application_state_t;
 
@@ -196,6 +199,16 @@ b8 application_init(struct game_entry *game_inst) {
 	  return false;
 	}
 
+	/* set texture memory allocation */
+	texture_sys_config_t tex_sys_config;
+	tex_sys_config.max_texture_count = 65536;
+	texture_sys_init(&p_state->textures.size, 0, tex_sys_config);
+	p_state->textures.state = arena_allocate(&p_state->arena, p_state->textures.size);
+	if (!texture_sys_init(&p_state->textures.size, p_state->textures.state, tex_sys_config)) {
+		ar_FATAL("Texture failed to initialize");
+		return false;
+	}
+
 	/* game start */
 	if (!p_state->game_inst->init(p_state->game_inst)) {
 		ar_FATAL("Game failed to initialize");
@@ -290,8 +303,8 @@ b8 application_run(void) {
 	event_unreg(EVENT_CODE_APP_SUSPEND, 0, app_on_event);
 	event_unreg(EVENT_CODE_APP_RESUME, 0, app_on_event);
 	
-
 	input_shut(p_state->input.state);
+	texture_sys_shut(p_state->textures.state);
 	renderer_shut(p_state->renderer.state);
 	platform_shut(p_state->platform.state);
 	log_shut(p_state->log.state);
