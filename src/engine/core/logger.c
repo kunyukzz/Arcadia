@@ -1,12 +1,9 @@
 #include "logger.h"
 #include "engine/core/assertion.h"
-#include "engine/core/strings.h"
+#include "engine/core/ar_strings.h"
 
 #include "engine/platform/filesystem.h"
 #include "engine/memory/memory.h"
-
-#include <stdarg.h>
-#include <stdio.h>
 
 #define LENGTH 32000
 
