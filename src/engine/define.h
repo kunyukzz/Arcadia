@@ -27,7 +27,7 @@ typedef _Bool b8;
 
 // Inline
 #if defined(__clang__) || defined(__gcc__)
-	#define _arinline __attribute__((always_inline)) inline
+	#define _arinline __attribute__((always_inline)) static inline
 	#define _arnoinline __attribute__((noinline))
 #elif defined(_MSC_VER)
 	#define _arinline __forceinline

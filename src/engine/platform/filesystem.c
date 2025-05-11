@@ -46,19 +46,18 @@ void filesystem_close(file_handle_t* handle) {
 	}
 }
 
-b8 filesystem_read_line(file_handle_t* handle, char** line_buff) {
-	if (handle->handle) {
-		char buffer[24000];
+b8 filesystem_read_line(file_handle_t *handle, uint64_t max, char **line_buff,
+                        uint64_t *line_length) {
+    if (handle->handle && line_buff && line_length && max > 0) {
+        char *buffer = *line_buff;
 
-		if (fgets(buffer, 24000, (FILE *)handle->handle) != 0) {
-			uint64_t length = strlen(buffer);
-			*line_buff = memory_alloc((sizeof(char) * length) + 1, MEMTAG_STRING);
-			strcpy(*line_buff, buffer);
-			return true;
-		}
-	}
+        if (fgets(buffer, max, (FILE *)handle->handle) != 0) {
+            *line_length = strlen(*line_buff);
+            return true;
+        }
+    }
 
-	return false;
+    return false;
 }
 
 b8 filesystem_write_line(file_handle_t* handle, const char* text) {

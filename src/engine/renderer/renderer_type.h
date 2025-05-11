@@ -17,17 +17,16 @@ typedef struct global_uni_obj_t {
 	mat4 _reserved1;
 } global_uni_obj_t;
 
-typedef struct local_uni_obj_t {
+typedef struct material_uni_obj_t {
 	vec4 diffuse_col;
 	vec4 v_reserved0;
 	vec4 v_reserved1;
 	vec4 v_reserved2;
-} local_uni_obj_t;
+} material_uni_obj_t;
 
 typedef struct geo_render_data_t {
-	uint32_t obj_id;
 	mat4 model;
-	texture_t *textures[16];
+	material_t *material;
 } geo_render_data_t;
 
 typedef struct render_backend_t {
@@ -45,11 +44,11 @@ typedef struct render_backend_t {
     b8 (*end_frame)(struct render_backend_t *backend, float delta_time);
 	void (*update_obj)(geo_render_data_t data);
 
-    void (*init_tex)(const char *name, int32_t width,
-                       int32_t height, int32_t channel_count,
-                       const uint8_t *pixel, b8 has_transparent,
-                       texture_t *texture);
+    void (*init_tex)(const uint8_t *pixel, texture_t *texture);
     void (*shut_tex)(texture_t *texture);
+
+	b8 (*init_material)(material_t *material);
+	void (*shut_material)(material_t *material);
 
 } render_backend_t;
 

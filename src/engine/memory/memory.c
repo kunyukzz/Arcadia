@@ -1,6 +1,6 @@
 #include "engine/memory/memory.h"
 #include "engine/core/logger.h"
-#include "engine/core/strings.h"
+#include "engine/core/ar_strings.h"
 
 #include <stdlib.h>
 
