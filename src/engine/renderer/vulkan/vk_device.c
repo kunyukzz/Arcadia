@@ -2,7 +2,7 @@
 
 #include "engine/container/dyn_array.h"
 #include "engine/core/logger.h"
-#include "engine/core/strings.h"
+#include "engine/core/ar_strings.h"
 
 #include "engine/memory/memory.h"
 

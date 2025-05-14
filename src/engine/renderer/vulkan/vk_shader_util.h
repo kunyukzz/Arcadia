@@ -3,7 +3,7 @@
 
 #include "engine/renderer/vulkan/vk_type.h"
 #include "engine/core/logger.h"
-#include "engine/core/strings.h"
+#include "engine/core/ar_strings.h"
 #include "engine/memory/memory.h"
 #include "engine/platform/filesystem.h"
 
