@@ -138,6 +138,12 @@ void  vk_buffer_unlock_mem(vulkan_context_t *ctx, vulkan_buffer_t *buffer) {
 void  vk_buffer_load_data(vulkan_context_t *ctx, vulkan_buffer_t *buffer,
                           uint64_t offset, uint64_t size, uint32_t flag,
                           const void *data) {
+/*     if (offset + size > buffer->total_size) {
+        ar_FATAL("vk_buffer_load_data: Offset + size (%llu) exceeds buffer size (%llu)",
+                 offset + size, buffer->total_size);
+        return;
+    } */
+    
 	void *data_ptr;
     VK_CHECK(vkMapMemory(ctx->device.logic_dev, buffer->memory, offset, size,
                          flag, &data_ptr));

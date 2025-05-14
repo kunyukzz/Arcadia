@@ -1,6 +1,9 @@
+/* This should be include first before anything
+else since platform_time using _POSIX_C_SOURCE. */
+#include "engine/platform/platform_time.h"
+
 #include "engine/math/maths.h"
 
-#include "engine/platform/platform_time.h"
 #include "engine/core/assertion.h"
 
 #include <math.h>

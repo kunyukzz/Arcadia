@@ -1,8 +1,9 @@
 bin/
 obj/
-.cache/
-err.txt
+compile_commands.json
 console.log
+.cache/
+
 Arcadia_Engine.srctrlbm
 Arcadia_Engine.srctrldb
 Arcadia_Engine.srctrlprj

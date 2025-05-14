@@ -1,9 +1,10 @@
 #ifndef __PLATFORM_TIME_H__
 #define __PLATFORM_TIME_H__
 
-#include "engine/define.h"
+#define _POSIX_C_SOURCE 200809L
 #include <time.h>
-#include <unistd.h>
+
+#include "engine/define.h"
 
 typedef struct platform_time_t {
 	double start_time;

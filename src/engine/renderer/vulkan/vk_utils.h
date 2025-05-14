@@ -4,7 +4,7 @@
 #include "engine/renderer/vulkan/vk_type.h"
 #include "engine/container/dyn_array.h"
 #include "engine/core/logger.h"
-#include "engine/core/strings.h"
+#include "engine/core/ar_strings.h"
 
 static inline const char **vk_req_get_extensions(uint32_t *count) {
 	const char **extensions = dyn_array_create(const char *);

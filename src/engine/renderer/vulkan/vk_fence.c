@@ -1,6 +1,7 @@
 #include "engine/renderer/vulkan/vk_fence.h"
 
 #include "engine/core/logger.h"
+#include <vulkan/vulkan_core.h>
 
 void vk_fence_init(vulkan_context_t *ctx, b8 signaling, vulkan_fence_t *fence) {
 	fence->is_signaled = signaling;
@@ -26,6 +27,11 @@ void vk_fence_shut(vulkan_context_t *ctx, vulkan_fence_t *fence) {
 b8 vk_fence_wait(vulkan_context_t *ctx, vulkan_fence_t *fence,
                  uint64_t timeout) {
     if (!fence->is_signaled) {
+        // BUG: missleading validation message
+        // TODO: GitHub Issue #5589
+        // ADDED QUEUE WAIT IDLE TO MISLEADING MESSAGE FROM VULKAN VALIDATION BUG!!!
+        vkQueueWaitIdle(ctx->device.graphics_queue);
+
         VkResult result = vkWaitForFences(ctx->device.logic_dev, 1,
                                           &fence->handle, true, timeout);
         switch (result) {
