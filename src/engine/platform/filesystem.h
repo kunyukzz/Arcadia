@@ -28,10 +28,15 @@ _arapi b8   filesystem_write_line(file_handle_t *handle, const char *text);
 _arapi b8   filesystem_read(file_handle_t *handle, uint64_t data_size,
                             void *out_data, uint64_t *out_byte_read);
 
-_arapi b8   filesystem_read_all_byte(file_handle_t *handle, uint8_t **out_bytes,
+_arapi b8   filesystem_read_all_byte(file_handle_t *handle, uint8_t *out_bytes,
+                                     uint64_t *out_byte_read);
+
+_arapi b8   filesystem_read_all_text(file_handle_t *handle, char *text,
                                      uint64_t *out_byte_read);
 
 _arapi b8   filesystem_write(file_handle_t *handle, uint64_t data_size,
                              const void *data, uint64_t *out_byte_written);
+
+_arapi b8 filesystem_size(file_handle_t *handle, uint64_t *size);
 
 #endif //__FILESYSTEM_H__

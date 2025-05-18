@@ -1,20 +1,26 @@
+/* This should be include first before anything
+else since platform_time using _POSIX_C_SOURCE. */
+#include "engine/platform/platform_time.h"
+
 #include "engine/engine.h"
 
 #include "engine/core/application.h"
 #include "engine/core/logger.h"
 #include "engine/core/event.h"
 #include "engine/core/input.h"
-#include "engine/core/strings.h"
-
+#include "engine/core/ar_strings.h"
 #include "engine/memory/memory.h"
 #include "engine/memory/arena.h"
-
-#include "engine/platform/platform_time.h"
 #include "engine/platform/platform.h"
-
 #include "engine/renderer/renderer_fe.h"
 
 #include "engine/systems/texture_sys.h"
+#include "engine/systems/material_sys.h"
+#include "engine/systems/geometry_sys.h"
+#include "engine/systems/resource_sys.h"
+
+// TODO: Temporary
+#include "engine/math/maths.h"
 
 typedef struct subsys_state_t {
 	uint64_t size;
@@ -38,18 +44,22 @@ typedef struct application_state_t {
 	subsys_state_t log;
 	subsys_state_t input;
 	subsys_state_t platform;
+	subsys_state_t resources;
 	subsys_state_t renderer;
 	subsys_state_t textures;
+	subsys_state_t material;
+	subsys_state_t geometry;
+
+	// TODO: Temporary
+	geometry_t *test_geo;
 
 } application_state_t;
 
 static application_state_t *p_state;
 
 
-/* 				 this is part of internal event handling for engine 		  */
 /* ========================= PRIVATE FUNCTION =============================== */
 /* ========================================================================== */
-
 b8 app_on_event(uint16_t code, void *sender, void *listener, event_context_t ec) {
 	(void)sender;
 	(void)listener;
@@ -132,6 +142,34 @@ b8 app_on_resized(uint16_t code, void *sender, void *listener, event_context_t e
 	return false;
 }
 
+b8 app_on_debug(uint16_t code, void *sender, void *listener,
+                event_context_t ec) {
+	(void)code;
+	(void)sender;
+	(void)listener;
+	(void)ec;
+
+    const char   *names[3] = {"cobblestone", "paving", "paving2"};
+    static int8_t choice   = 2;
+    const char   *old      = names[choice];
+    choice++;
+    choice %= 3;
+
+    if (p_state->test_geo) {
+        p_state->test_geo->material->diffuse_map.texture =
+            texture_sys_acquire(names[choice], true);
+
+        if (!p_state->test_geo->material->diffuse_map.texture) {
+            ar_WARNING("app_on_debug - no texture! use default one");
+            p_state->test_geo->material->diffuse_map.texture =
+                texture_sys_get_default_tex();
+        }
+
+        texture_sys_release(old);
+    }
+
+    return true;
+}
 /* ========================================================================== */
 /* ========================================================================== */
 
@@ -177,6 +215,7 @@ b8 application_init(struct game_entry *game_inst) {
 	event_reg(EVENT_CODE_RESIZED, 0, app_on_resized);
 	event_reg(EVENT_CODE_APP_SUSPEND, 0, app_on_event);
 	event_reg(EVENT_CODE_APP_RESUME, 0, app_on_event);
+	event_reg(EVENT_CODE_DEBUG0, 0, app_on_debug);
 
 	/* set platform memory allocation */
 	platform_init(&p_state->platform.size, 0, 0, 0, 0, 0, 0);
@@ -189,7 +228,20 @@ b8 application_init(struct game_entry *game_inst) {
 					   game_inst->app_config.width,
 					   game_inst->app_config.height)) return false;
 
-	/* set renderer memory allocation */
+	/* Resources System */
+	resource_sys_config_t resc_sys_config;
+	resc_sys_config.base_path = "../assets";
+	resc_sys_config.max_loader_count = 32;
+	resource_sys_init(&p_state->resources.size, 0, resc_sys_config);
+    p_state->resources.state =
+        arena_allocate(&p_state->arena, p_state->resources.size);
+    if (!resource_sys_init(&p_state->resources.size, p_state->resources.state,
+                           resc_sys_config)) {
+        ar_FATAL("Failed to initialize resource.");
+        return false;
+    }
+
+    /* set renderer memory allocation */
 	renderer_init(&p_state->renderer.size, 0, 0);
 	p_state->renderer.state =
 		arena_allocate(&p_state->arena, p_state->renderer.size);
@@ -199,15 +251,52 @@ b8 application_init(struct game_entry *game_inst) {
 	  return false;
 	}
 
-	/* set texture memory allocation */
-	texture_sys_config_t tex_sys_config;
-	tex_sys_config.max_texture_count = 65536;
-	texture_sys_init(&p_state->textures.size, 0, tex_sys_config);
-	p_state->textures.state = arena_allocate(&p_state->arena, p_state->textures.size);
-	if (!texture_sys_init(&p_state->textures.size, p_state->textures.state, tex_sys_config)) {
-		ar_FATAL("Texture failed to initialize");
-		return false;
-	}
+    /* set texture memory allocation */
+    texture_sys_config_t tex_sys_config;
+    tex_sys_config.max_texture_count = 65536;
+    texture_sys_init(&p_state->textures.size, 0, tex_sys_config);
+    p_state->textures.state =
+        arena_allocate(&p_state->arena, p_state->textures.size);
+    if (!texture_sys_init(&p_state->textures.size, p_state->textures.state,
+                          tex_sys_config)) {
+        ar_FATAL("Texture failed to initialize");
+        return false;
+    }
+
+    /* Material System */
+    material_sys_config_t mat_sys_cfg;
+    mat_sys_cfg.max_material_count = 4096;
+    material_sys_init(&p_state->material.size, 0, mat_sys_cfg);
+    p_state->material.state =
+        arena_allocate(&p_state->arena, p_state->material.size);
+    if (!material_sys_init(&p_state->material.size, p_state->material.state,
+                           mat_sys_cfg)) {
+        ar_FATAL("Material failed to initialize");
+        return false;
+    }
+
+    /* Geometry System */
+    geo_sys_cfg_t geo_sys_cfg;
+    geo_sys_cfg.max_geo_count = 4096;
+    geometry_sys_init(&p_state->geometry.size, 0, geo_sys_cfg);
+    p_state->geometry.state =
+        arena_allocate(&p_state->arena, p_state->geometry.size);
+    if (!geometry_sys_init(&p_state->geometry.size, p_state->geometry.state,
+                           geo_sys_cfg)) {
+        ar_FATAL("Geometry failed to initialize");
+        return false;
+    }
+
+    // TODO: Temporary
+    geo_config_t gc =
+        geometry_sys_gen_plane_config(10.0f, 5.0f, 5, 5, 5.0f, 2.0f,
+                                      "test geometry", "test_material");
+
+    p_state->test_geo = geometry_sys_get_default();
+
+    memory_free(gc.vertices, sizeof(vertex_3d) * gc.vertex_count, MEMTAG_GAME);
+	memory_free(gc.indices, sizeof(uint32_t) * gc.idx_count, MEMTAG_GAME);
+	// TODO: End Temporary
 
 	/* game start */
 	if (!p_state->game_inst->init(p_state->game_inst)) {
@@ -231,7 +320,7 @@ b8 application_run(void) {
 	double runtime = 0;
 	uint8_t frame_count = 0;
 	float target_frame_seconds = 1.0f / 60;
-	const b8 limit = true;
+	const b8 limit = false;
 
 	char *stats = memory_debug_stats();
 	ar_INFO(stats);
@@ -264,27 +353,16 @@ b8 application_run(void) {
 
 			render_packet_t packet;
 			packet.delta = delta;
-			renderer_draw_frame(&packet);
 
-			/* calculate how long frame took */
-			/*
-			double frame_end_time = get_absolute_time();
-			double frame_elapsed_time = frame_end_time - frame_start_time;
-			runtime += frame_elapsed_time;
-			double remain_seconds = target_frame_seconds - frame_elapsed_time;
-			
-			if (remain_seconds > 0) {
-				uint64_t remain_ms = (remain_seconds * 1000);
-				b8 limit = true;
-				if (remain_ms > 0 && limit) {
-					os_sleep(remain_ms);
-					//os_sleep(remain_ms - 1);
-					//ar_DEBUG("platform sleep");
-					ar_TRACE("sleeping for %llu ms", remain_ms);
-				}
-				frame_count++;
-			}
-			*/
+			// TODO: Temporary
+			geo_render_data_t test_render;
+			test_render.geometry = p_state->test_geo;
+			test_render.model = mat4_identity();
+
+			packet.geo_count = 1;
+			packet.geometries = &test_render;
+
+			renderer_draw_frame(&packet);
 
 			double next_frame_time = frame_start_time + target_frame_seconds;
 			double frame_end_time = get_absolute_time();
@@ -293,14 +371,16 @@ b8 application_run(void) {
 
 			if (limit && frame_end_time < next_frame_time) {
 				os_sleep(next_frame_time);
-				ar_TRACE("abs sleep until %.6f (%.3fms remain)", next_frame_time, (next_frame_time - frame_end_time) * 1000.0);
-			}
-			frame_count++;
+                // ar_TRACE("abs sleep until %.6f (%.3fms remain)",
+                // next_frame_time, (next_frame_time - frame_end_time) *
+                // 1000.0);
+            }
+            frame_count++;
 
 			input_update(delta);
 
 			/* hahahahaa */
-			ar_TRACE("runtime: %f, frame_count: %u", runtime, frame_count);
+			//ar_TRACE("runtime: %f, frame_count: %u", runtime, frame_count);
 			(void)runtime;
 			(void)frame_count;
 		}
@@ -315,10 +395,14 @@ b8 application_run(void) {
 	event_unreg(EVENT_CODE_RESIZED, 0, app_on_resized);
 	event_unreg(EVENT_CODE_APP_SUSPEND, 0, app_on_event);
 	event_unreg(EVENT_CODE_APP_RESUME, 0, app_on_event);
+	event_unreg(EVENT_CODE_DEBUG0, 0, app_on_debug);
 	
 	input_shut(p_state->input.state);
+	geometry_sys_shut(p_state->geometry.state);
+	material_sys_shut(p_state->material.state);
 	texture_sys_shut(p_state->textures.state);
 	renderer_shut(p_state->renderer.state);
+	resource_sys_shut(p_state->resources.state);
 	platform_shut(p_state->platform.state);
 	log_shut(p_state->log.state);
 	memory_shut(p_state->memory.state);

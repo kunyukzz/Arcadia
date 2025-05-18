@@ -1,7 +1,8 @@
 #include "engine/platform/filesystem.h"
 #include "engine/core/logger.h"
-#include "engine/memory/memory.h"
+//#include "engine/memory/memory.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -74,41 +75,69 @@ b8 filesystem_write_line(file_handle_t* handle, const char* text) {
 	return false;
 }
 
-b8 filesystem_read(file_handle_t* handle, uint64_t data_size, void* out_data, uint64_t* out_byte_read) {
-	if (handle->handle && out_data) {
-		*out_byte_read = fread(out_data, 1, data_size, (FILE *)handle->handle);
+b8 filesystem_read(file_handle_t *handle, uint64_t data_size, void *out_data,
+                   uint64_t *out_byte_read) {
+    if (handle->handle && out_data) {
+        *out_byte_read = fread(out_data, 1, data_size, (FILE *)handle->handle);
 
-		if (*out_byte_read != data_size) return false;
+        if (*out_byte_read != data_size)
+            return false;
 
-		return true;
-	}
-	return false;
+        return true;
+    }
+    return false;
 }
 
-b8 filesystem_read_all_byte(file_handle_t* handle, uint8_t** out_bytes, uint64_t* out_byte_read) {
-	if (handle->handle) {
+b8 filesystem_read_all_byte(file_handle_t *handle, uint8_t *out_bytes,
+                            uint64_t *out_byte_read) {
+    if (handle->handle && out_bytes && out_byte_read) {
+        uint64_t size = 0;
+        if (!filesystem_size(handle, &size)) {
+            return false;
+        }
+
+        *out_byte_read = fread(out_bytes, 1, size, (FILE *)handle->handle);
+        return *out_byte_read == size;
+    }
+    return false;
+}
+
+b8 filesystem_read_all_text(file_handle_t *handle, char *text,
+                            uint64_t *out_byte_read) {
+    if (handle->handle && text && out_byte_read) {
+        uint64_t size = 0;
+        if (!filesystem_size(handle, &size)) {
+            return false;
+        }
+
+        *out_byte_read = fread(text, 1, size, (FILE *)handle->handle);
+        return *out_byte_read == size;
+    }
+
+    return false;
+}
+
+b8 filesystem_write(file_handle_t *handle, uint64_t data_size, const void *data,
+                    uint64_t *out_byte_written) {
+    if (handle->handle) {
+        *out_byte_written = fwrite(data, 1, data_size, (FILE *)handle->handle);
+
+        if (*out_byte_written != data_size)
+            return false;
+
+        fflush((FILE *)handle->handle);
+        return true;
+    }
+    return false;
+}
+
+b8 filesystem_size(file_handle_t *handle, uint64_t *size) {
+ 	if (handle->handle) {
 		fseek((FILE *)handle->handle, 0, SEEK_END);
-		uint64_t size = (uint64_t)ftell((FILE *)handle->handle);
+		*size = (uint64_t)ftell((FILE *)handle->handle);
 		rewind((FILE *)handle->handle);
-
-		*out_bytes = memory_alloc(sizeof(uint8_t) * size, MEMTAG_STRING);
-		*out_byte_read = fread(*out_bytes, 1, size, (FILE *)handle->handle);
-
-		if (*out_byte_read != size) return false;
-
 		return true;
 	}
-	return false;
-}
 
-b8 filesystem_write(file_handle_t* handle, uint64_t data_size, const void* data, uint64_t* out_byte_written) {
-	if (handle->handle) {
-		*out_byte_written = fwrite(data, 1, data_size, (FILE *)handle->handle);
-
-		if (*out_byte_written != data_size) return false;
-
-		fflush((FILE *)handle->handle);
-		return true;
-	}
 	return false;
 }
