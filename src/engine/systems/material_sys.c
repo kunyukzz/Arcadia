@@ -6,9 +6,7 @@
 #include "engine/math/maths.h"
 #include "engine/renderer/renderer_fe.h"
 #include "engine/systems/texture_sys.h"
-
-// TODO: Temporary
-#include "engine/platform/filesystem.h"
+#include "engine/systems/resource_sys.h"
 
 typedef struct material_sys_state_t {
 	material_sys_config_t config;
@@ -100,87 +98,9 @@ void default_material_shut(material_t *mt) {
 	mt->gen = INVALID_ID;
 	mt->internal_id = INVALID_ID;
 }
-
-b8 load_config_file(const char *path, material_config_t *config) {
-	file_handle_t f;
-	if (!filesystem_open(path, MODE_READ, false, &f)) {
-        ar_ERROR("load_config_file() - unable to open material file for "
-                 "reading: '%s'", path);
-        return false;
-    }
-
-	// Read each line
-	char line_buff[512] = "";
-	char *p = &line_buff[0];
-	uint64_t line_length = 0;
-	uint32_t line_number = 1;
-
-	// total = 64 + 446 = 510 (+ 1 null + maybe '\n')
-	while (filesystem_read_line(&f, 511, &p, &line_length)) {
-		// Trim string
-		char *trim = string_trim(line_buff);
-
-		// Get trim length
-		line_length = string_length(trim);
-		if (line_length < 1 || trim[0] == '#') {
-			line_number++;
-			continue;
-		}
-
-		// split into var/value
-        int32_t equal_idx = string_index_of(trim, '=');
-        if (equal_idx == -1) {
-            ar_WARNING("Potential format issue found in: '%s'-> '=' token not "
-                       "found. Skip line %u.",
-                       path, line_number);
-            line_number++;
-            continue;
-        }
-
-		// always assume max 64 char for variable name
-		char raw_var_name[64];
-		memory_zero(raw_var_name, sizeof(char) * 64);
-		string_mid(raw_var_name, trim, 0, equal_idx);
-		char *trim_var_name = string_trim(raw_var_name);
-
-		// always assume in here too
-		char raw_value[446];
-		memory_zero(raw_value, sizeof(char) * 446);
-		string_mid(raw_value, trim, equal_idx + 1, -1);
-		char *trim_value = string_trim(raw_value);
-
-		// process variable
-		if (string_equali(trim_var_name, "version")) {
-			// TODO: Version
-		} else if (string_equali(trim_var_name, "name")) {
-			string_ncopy(config->name, trim_value, MATERIAL_NAME_MAX_LENGTH);
-		} else if (string_equali(trim_var_name, "diffuse_map_name")) {
-            string_ncopy(config->diffuse_map_name, trim_value,
-                         TEXTURE_NAME_MAX_LENGTH);
-        } else if (string_equali(trim_var_name, "diffuse_color")) {
-            // parse Color
-
-			if (!string_to_vec4(trim_value, &config->diffuse_color)) {
-				ar_WARNING("Error parsing diffuse_color in file: '%s'", path);
-				config->diffuse_color = vec4_one(); // set white 
-			}
-        } else {
-            ar_WARNING("Unknown field '%s' in material file: '%s'",
-                       trim_var_name, path);
-        }
-
-        // TODO: more fields
-
-		memory_zero(line_buff, sizeof(char) * 512);
-		line_number++;
-    }
-
-	filesystem_close(&f);
-	return true;
-}
-
 /* ========================================================================== */
 /* ========================================================================== */
+
 b8   material_sys_init(uint64_t *memory_require, void *state,
                        material_sys_config_t config) {
 	if (config.max_material_count == 0) {
@@ -257,20 +177,22 @@ material_t *material_sys_get_default(void) {
 }
 
 material_t *material_sys_acquire(const char *name) {
-	material_config_t cfg;
-
-	char *format_str = "assets/materials/%s.%s";
-	char full_file_path[512];
-	ar_TRACE("Loading material from path: %s", full_file_path);
-
-	string_format(full_file_path, format_str, name, "ar_mat");
-	if (!load_config_file(full_file_path, &cfg)) {
-        ar_ERROR("Failed to load material: '%s'. Null pointer return",
-                 full_file_path);
+    resource_t material_resc;
+    if (!resource_sys_load(name, RESC_TYPE_MATERIAL, &material_resc)) {
+        ar_ERROR("Failed to load material.");
         return 0;
     }
 
-	return material_sys_acquire_from_config(cfg);
+    material_t *m;
+    m = material_sys_acquire_from_config(
+        *(material_config_t *)material_resc.data);
+
+    resource_sys_unload(&material_resc);
+
+    if (!m)
+        ar_ERROR("Failed to load material.");
+
+	return m;
 }
 
 material_t *material_sys_acquire_from_config(material_config_t config) {
