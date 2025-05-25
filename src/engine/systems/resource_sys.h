@@ -13,6 +13,7 @@ typedef struct resource_loader_t {
 	resource_type_t type;
 	const char *custom_type;
 	const char *type_path;
+	const char *file_exts;
 	b8 (*load)(struct resource_loader_t *self, const char *name, resource_t *resource);
 	void (*unload)(struct resource_loader_t *self, resource_t *resource);
 } resource_loader_t;

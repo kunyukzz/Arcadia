@@ -5,43 +5,33 @@
 #include "engine/core/logger.h"
 #include "engine/core/ar_strings.h"
 #include "engine/memory/memory.h"
-#include "engine/platform/filesystem.h"
-
-#define SHADER_DIR "assets/shaders/"
+#include "engine/systems/resource_sys.h"
 
 _arinline b8 vk_shader_module_init(vulkan_context_t *ctx, const char *name,
                          const char           *type_str,
                          VkShaderStageFlagBits shader_stg_flag,
                          uint32_t stg_idx, vulkan_shader_stage_t *shader_stg) {
 	char filename[512];
-	string_format(filename, SHADER_DIR "%s.%s.spv", name, type_str);
+	string_format(filename, "shaders/%s.%s.spv", name, type_str);
+    //ar_TRACE("File name: %s", filename);
+
+	resource_t binary_resc;
+	if (!resource_sys_load(filename, RESC_TYPE_BINARY, &binary_resc)) {
+		ar_ERROR("unable to read shader module: %s", filename);
+		return false;
+	}
 
 	memory_zero(&shader_stg[stg_idx].cr_info, sizeof(VkShaderModuleCreateInfo));
     shader_stg[stg_idx].cr_info.sType =
         VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-
-    file_handle_t handle;
-	if (!filesystem_open(filename, MODE_READ, true,  &handle)) {
-		ar_ERROR("Unable to read shader module: '%s'", filename);
-		return false;
-	}
-
-	uint64_t size = 0;
-	uint8_t *file_buff = 0;
-	if (!filesystem_read_all_byte(&handle, &file_buff, &size)) {
-		ar_ERROR("Unable to read binary shader module: '%s'", filename);
-		return false;
-	}
-	shader_stg[stg_idx].cr_info.codeSize = size;
-
-	// file_buff is 16-byte aligned from memory allocator, safe to cast
-	shader_stg[stg_idx].cr_info.pCode = (uint32_t *)(void *)file_buff;
-
-	filesystem_close(&handle);
+    shader_stg[stg_idx].cr_info.codeSize = binary_resc.data_size;
+    shader_stg[stg_idx].cr_info.pCode = (uint32_t *)binary_resc.data;
 
     VK_CHECK(vkCreateShaderModule(ctx->device.logic_dev,
                                   &shader_stg[stg_idx].cr_info, ctx->alloc,
                                   &shader_stg[stg_idx].handle));
+
+	resource_sys_unload(&binary_resc);
 
     memory_zero(&shader_stg[stg_idx].shader_stg_cr_info,
                 sizeof(VkPipelineShaderStageCreateInfo));

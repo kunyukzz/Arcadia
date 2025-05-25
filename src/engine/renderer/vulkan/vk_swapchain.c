@@ -237,7 +237,7 @@ void vk_image_view_init(vulkan_context_t *ctx, vulkan_swapchain_t *swap) {
 
         VK_CHECK(vkCreateImageView(ctx->device.logic_dev, &img_view_info,
                                    ctx->alloc, &swap->image_view[i]));
-		ar_TRACE("Created image view [%u]: %p", i, (void*)swap->image_view[i]);
+		//ar_TRACE("Created image view [%u]: %p", i, (void*)swap->image_view[i]);
     }
 }
 
