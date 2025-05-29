@@ -6,6 +6,7 @@
 #include "engine/math/maths.h"
 #include "engine/platform/filesystem.h"
 #include "engine/resources/resc_type.h"
+#include "engine/resources/loader_utils.h"
 #include "engine/systems/resource_sys.h"
 
 /* ========================= PRIVATE FUNCTION =============================== */
@@ -19,18 +20,19 @@ b8 material_loader_load(resource_loader_t *self, const char *name,
     string_format(full_path, format_str, resource_sys_base_path(),
                   self->type_path, name, ".ar_mat");
 
-    // TODO: Should use allocator.
-	resc->full_path = string_duplicate(full_path);
-
 	file_handle_t f;
 	if (!filesystem_open(full_path, MODE_READ, false, &f)) {
 		ar_ERROR("material_loader_load - unable to open file: '%s'", full_path);
 		return false;
 	}
 
+    // TODO: Should use allocator.
+	resc->full_path = string_duplicate(full_path);
+
 	// TODO: Should use allocator.
     material_config_t *resc_data =
         memory_alloc(sizeof(material_config_t), MEMTAG_MATERIAL);
+	resc_data->type = MATERIAL_TYPE_WORLD;
 	resc_data->auto_release = true;
 	resc_data->diffuse_color = vec4_one();
 	resc_data->diffuse_map_name[0] = 0;
@@ -83,6 +85,11 @@ b8 material_loader_load(resource_loader_t *self, const char *name,
 				ar_WARNING("Error parsing diffuse_color in file: '%s'", full_path);
 				resc_data->diffuse_color = vec4_one(); // set white
 			}
+		} else if (string_equali(trim_name, "type")) {
+			// TODO: other material type
+			if (string_equali(trim_value, "ui")) {
+				resc_data->type = MATERIAL_TYPE_UI;
+			}
         } else {
             ar_WARNING("Unknown field '%s' in material file: '%s'",
                        trim_name, full_path);
@@ -102,21 +109,8 @@ b8 material_loader_load(resource_loader_t *self, const char *name,
 }
 
 void material_loader_unload(resource_loader_t *self, resource_t *resc) {
-	if (!self || !resc) {
+	if (!resc_unload(self, resc, MEMTAG_MATERIAL)) {
 		ar_WARNING("material_loader_unload - call with nullptr");
-		return;
-	}
-
-	uint32_t path_length = string_length(resc->full_path);
-	if (path_length)
-        memory_free(resc->full_path, sizeof(char) * path_length + 1,
-                    MEMTAG_STRING);
-
-    if (resc->data) {
-		memory_free(resc->data, resc->data_size, MEMTAG_MATERIAL);
-		resc->data = 0;
-		resc->data_size = 0;
-		resc->id_loader = INVALID_ID;
 	}
 }
 /* ========================================================================== */

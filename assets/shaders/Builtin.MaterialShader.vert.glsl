@@ -1,7 +1,7 @@
 // Vertex Shaders
 
 #version 420
-#extension GL_ARB_separate_shader_objects : enable
+//#extension GL_ARB_separate_shader_objects : enable
 
 layout(location = 0) in vec3 in_pos;
 layout(location = 1) in vec2 in_texcoord;

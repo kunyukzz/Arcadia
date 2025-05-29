@@ -6,6 +6,7 @@
 
 #include "engine/renderer/renderer_fe.h"
 #include "engine/systems/material_sys.h"
+#include <stdint.h>
 
 typedef struct geo_ref_t {
 	uint64_t ref_count;
@@ -16,6 +17,7 @@ typedef struct geo_ref_t {
 typedef struct geometry_sys_state_t {
 	geo_sys_cfg_t sys_cfg;
 	geometry_t default_geometry;
+	geometry_t default_2d_geometry;
 	geo_ref_t *reg_geometry;
 } geometry_sys_state_t;
 
@@ -27,6 +29,7 @@ b8 default_geo_init(geometry_sys_state_t *state) {
 	vertex_3d verts[4];
 	memory_zero(verts, sizeof(vertex_3d) * 4);
 
+	/* Default Geometry */
 	const float f = 10.0f;
 
 	// Top Left
@@ -51,24 +54,67 @@ b8 default_geo_init(geometry_sys_state_t *state) {
 	verts[3].position.x = 0.5f * f;
 	verts[3].position.y = -0.5f * f;
 	verts[3].texcoord.x = 1.0f;
+	verts[3].texcoord.y = 0.0f;
 	
 	uint32_t indices[6] = {0, 1, 2, 0, 3, 1};
 
 	/* Send geometry to renderer to be upload to GPU */
-    if (!renderer_geometry_init(&state->default_geometry, 4, verts, 6,
-                                indices)) {
+    if (!renderer_geometry_init(&state->default_geometry, sizeof(vertex_3d), 4,
+                                verts, sizeof(uint32_t), 6, indices)) {
         ar_FATAL("Failed to create default geometry");
         return false;
     }
 
     state->default_geometry.material = material_sys_get_default();
 
+	/* Default 2D Geometry */
+	vertex_2d verts2d[4];
+	memory_zero(verts2d, sizeof(vertex_2d) * 4);
+
+	// Top Left
+	verts2d[0].position.x = -0.5f * f;
+	verts2d[0].position.y = -0.5f * f;
+	verts2d[0].texcoord.x = 0.0f;
+	verts2d[0].texcoord.y = 0.0f;
+
+	// Bottom Right
+	verts2d[1].position.x = 0.5f * f;
+	verts2d[1].position.y = 0.5 * f;
+	verts2d[1].texcoord.x = 1.0f;
+	verts2d[1].texcoord.y = 1.0f;
+
+	// Bottom Left
+	verts2d[2].position.x = -0.5 * f;
+	verts2d[2].position.y = 0.5 * f;
+	verts2d[2].texcoord.x = 0.0f;
+	verts2d[2].texcoord.y = 1.0f;
+
+	// Top Right
+	verts2d[3].position.x = 0.5f * f;
+	verts2d[3].position.y = -0.5f * f;
+	verts2d[3].texcoord.x = 1.0f;
+	verts2d[3].texcoord.y = 0.0f;
+
+	// NOTE: Counter-Clockwise
+	//uint32_t indices2d[6] = {2, 1, 0, 3, 0, 1};
+    uint32_t indices2d[6] = {0, 1, 2, 0, 3, 1};
+
+	/* Send geometry to renderer to be upload to GPU */
+    if (!renderer_geometry_init(&state->default_2d_geometry, sizeof(vertex_2d),
+                                4, verts2d, sizeof(uint32_t), 6, indices2d)) {
+        ar_FATAL("Failed to create default 2D geometry");
+        return false;
+    }
+
+    state->default_2d_geometry.material = material_sys_get_default();
+
 	return true;
 }
 
 b8 geo_init(geometry_sys_state_t *state, geo_config_t config, geometry_t *geo) {
     /* Send geometry to renderer to be upload to GPU */
-    if (!renderer_geometry_init(geo, config.vertex_count, config.vertices,
+    if (!renderer_geometry_init(geo, config.vertex_size, config.vertex_count,
+                                config.vertices, config.idx_size,
                                 config.idx_count, config.indices)) {
         state->reg_geometry[geo->id].ref_count    = 0;
         state->reg_geometry[geo->id].auto_release = false;
@@ -119,7 +165,7 @@ b8 geometry_sys_init(uint64_t *memory_require, void *state,
     /* Block of memory will contain state structure, then block for array, then
      * block for hashtable.*/
     uint64_t struct_req = sizeof(geometry_sys_state_t);
-    uint64_t array_req  = sizeof(geometry_t) * sys_cfg.max_geo_count;
+    uint64_t array_req  = sizeof(geo_ref_t) * sys_cfg.max_geo_count;
     *memory_require     = struct_req + array_req;
 
     if (!state) {
@@ -206,6 +252,15 @@ geometry_t *geometry_sys_get_default(void) {
     return 0;
 }
 
+geometry_t *geometry_sys_get_default_2d(void) {
+    if (p_state)
+        return &p_state->default_2d_geometry;
+
+    ar_FATAL("geometry_system_get_default_2d called before system was "
+             "initialized. Returning nullptr.");
+    return 0;
+}
+
 void geometry_sys_release(geometry_t *geometry) {
     if (geometry && geometry->id != INVALID_ID) {
         geo_ref_t *ref = &p_state->reg_geometry[geometry->id];
@@ -272,7 +327,9 @@ geo_config_t geometry_sys_gen_plane_config(float width, float height,
     }
 
     geo_config_t config;
+	config.vertex_size = sizeof(vertex_3d);
     config.vertex_count = x_segcount * y_segcount * 4; // vertex per segment
+	config.idx_size = sizeof(uint32_t);
     config.idx_count    = x_segcount * y_segcount * 6; // indices per segment
     config.vertices =
         memory_alloc(sizeof(vertex_3d) * config.vertex_count, MEMTAG_ARRAY);
@@ -297,10 +354,10 @@ geo_config_t geometry_sys_gen_plane_config(float width, float height,
             float      max_uvy  = ((y + 1) / (float)y_segcount) * tile_y;
 
             uint32_t   v_offset = ((y * x_segcount) + x) * 4;
-            vertex_3d *v0       = &config.vertices[v_offset + 0];
-            vertex_3d *v1       = &config.vertices[v_offset + 1];
-            vertex_3d *v2       = &config.vertices[v_offset + 2];
-            vertex_3d *v3       = &config.vertices[v_offset + 3];
+            vertex_3d *v0       = &((vertex_3d *)config.vertices)[v_offset + 0];
+            vertex_3d *v1       = &((vertex_3d *)config.vertices)[v_offset + 1];
+            vertex_3d *v2       = &((vertex_3d *)config.vertices)[v_offset + 2];
+            vertex_3d *v3       = &((vertex_3d *)config.vertices)[v_offset + 3];
 
             v0->position.x      = min_x;
             v0->position.y      = min_y;
@@ -324,12 +381,12 @@ geo_config_t geometry_sys_gen_plane_config(float width, float height,
 
             // generate indices
             uint32_t i_offset   = ((y * x_segcount) + x) * 6;
-            config.indices[i_offset + 0] = v_offset + 0;
-            config.indices[i_offset + 1] = v_offset + 1;
-            config.indices[i_offset + 2] = v_offset + 2;
-            config.indices[i_offset + 3] = v_offset + 0;
-            config.indices[i_offset + 4] = v_offset + 3;
-            config.indices[i_offset + 5] = v_offset + 1;
+			((uint32_t *)config.indices)[i_offset + 0] = v_offset + 0;
+			((uint32_t *)config.indices)[i_offset + 1] = v_offset + 1;
+			((uint32_t *)config.indices)[i_offset + 2] = v_offset + 2;
+			((uint32_t *)config.indices)[i_offset + 3] = v_offset + 0;
+			((uint32_t *)config.indices)[i_offset + 4] = v_offset + 3;
+			((uint32_t *)config.indices)[i_offset + 5] = v_offset + 1;
         }
     }
 

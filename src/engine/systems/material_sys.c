@@ -41,7 +41,7 @@ b8 default_material_init(material_sys_state_t *state) {
 	// TODO: create renderer material initialized
 
     if (!renderer_material_init(&state->default_material)) {
-        ar_FATAL("Failed to acquire renderer resources for default texture. "
+        ar_FATAL("Failed to acquire renderer resources for default material. "
                  "Application cannot continue.");
         return false;
     }
@@ -53,6 +53,9 @@ b8 load_material(material_config_t config, material_t *mt) {
 	memory_zero(mt, sizeof(material_t));
 
 	string_ncopy(mt->name, config.name, MATERIAL_NAME_MAX_LENGTH);
+
+	/* Type */
+	mt->type = config.type;
 
 	/* Diffuse Color */
 	mt->diffuse_color = config.diffuse_color;

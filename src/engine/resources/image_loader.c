@@ -4,6 +4,7 @@
 #include "engine/core/logger.h"
 #include "engine/memory/memory.h"
 #include "engine/resources/resc_type.h"
+#include "engine/resources/loader_utils.h"
 #include "engine/systems/resource_sys.h"
 
 #pragma clang diagnostic push
@@ -68,31 +69,13 @@ b8 image_loader_load(resource_loader_t *self, const char *name,
 }
 
 void image_loader_unload(resource_loader_t *self, resource_t *resc) {
-	if (!self || !resc) {
-		ar_WARNING("image_loader_unload - call with nullptr");
-		return;
-	}
+    image_resc_data_t *resc_data = (image_resc_data_t *)resc->data;
+    if (resc_data && resc_data->pixels) {
+        stbi_image_free(resc_data->pixels);
+        resc_data->pixels = NULL;
+    }
 
-	uint32_t path_length = string_length(resc->full_path);
-	if (path_length) {
-        memory_free(resc->full_path, sizeof(char) * path_length + 1,
-                    MEMTAG_STRING);
-		resc->full_path = 0;
-	}
-
-    if (resc->data) {
-		image_resc_data_t *resc_data = (image_resc_data_t *)resc->data;
-
-		if (resc_data->pixels) {
-			stbi_image_free(resc_data->pixels);
-			resc_data->pixels = 0;
-		}
-
-		memory_free(resc->data, resc->data_size, MEMTAG_TEXTURE);
-		resc->data = 0;
-		resc->data_size = 0;
-		resc->id_loader = INVALID_ID;
-	}
+    resc_unload(self, resc, MEMTAG_TEXTURE);
 }
 /* ========================================================================== */
 /* ========================================================================== */

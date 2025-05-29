@@ -10,10 +10,12 @@ typedef struct geo_sys_cfg_t {
 } geo_sys_cfg_t;
 
 typedef struct geo_config_t {
-	vertex_3d *vertices;
+	uint32_t vertex_size;
 	uint32_t vertex_count;
+	uint32_t idx_size;
 	uint32_t idx_count;
-	uint32_t *indices;
+	void *vertices;
+	void *indices;
 	char name[GEOMETRY_NAME_MAX_LENGTH];
 	char material_name[MATERIAL_NAME_MAX_LENGTH];
 } geo_config_t;
@@ -24,6 +26,7 @@ void geometry_sys_shut(void *state);
 geometry_t *geometry_sys_acquire_by_id(uint32_t id);
 geometry_t *geometry_sys_acquire_by_config(geo_config_t config, b8 auto_release);
 geometry_t *geometry_sys_get_default(void);
+geometry_t *geometry_sys_get_default_2d(void);
 
 void geometry_sys_release(geometry_t *geometry);
 geo_config_t geometry_sys_gen_plane_config(float width, float height,

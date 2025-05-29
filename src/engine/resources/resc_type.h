@@ -31,6 +31,7 @@ typedef struct image_resc_data_t {
 	uint8_t *pixels;
 } image_resc_data_t;
 
+/* ================================ Texture ================================= */
 typedef struct texture_t {
 	uint32_t id;
 	uint32_t width;
@@ -54,8 +55,15 @@ typedef struct texture_map_t {
 	texture_use_t used;
 } texture_map_t;
 
+/* =============================== Material ================================= */
+typedef enum material_type_t {
+	MATERIAL_TYPE_WORLD,
+	MATERIAL_TYPE_UI
+} material_type_t;
+
 typedef struct material_config_t {
 	char name[MATERIAL_NAME_MAX_LENGTH];
+	material_type_t type;
 	b8 auto_release;
 	vec4 diffuse_color;
 	char diffuse_map_name[TEXTURE_NAME_MAX_LENGTH];
@@ -68,8 +76,10 @@ typedef struct material_t {
 	char name[MATERIAL_NAME_MAX_LENGTH];
 	vec4 diffuse_color;
 	texture_map_t diffuse_map;
+	material_type_t type;
 } material_t;
 
+/* =============================== Geometry ================================= */
 typedef struct geometry_t {
 	uint32_t id;
 	uint32_t gen;
