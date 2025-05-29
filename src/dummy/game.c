@@ -63,7 +63,7 @@ b8 game_run(game_entry *game_inst, float delta_time) {
 
     // TODO: Temporary
 	if (input_keyup('T') && input_was_keydown('T')) {
-		ar_DEBUG("Switch Texture");
+		ar_DEBUG("Switch Texture...");
 		event_context_t ev = {0};
 		event_push(EVENT_CODE_DEBUG0, 0, ev);
 	}

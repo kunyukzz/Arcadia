@@ -380,7 +380,7 @@ void vk_device_shut(vulkan_context_t *context) {
 		ar_INFO("Kill Logical Device");
 	}
 
-	ar_INFO("Kill Physical Device");
+	ar_INFO("Release Physical Device");
 	context->device.phys_dev = 0;
 
 	if (context->device.support.formats) {

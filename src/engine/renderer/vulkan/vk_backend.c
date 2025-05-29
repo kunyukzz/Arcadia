@@ -1,9 +1,12 @@
 #include "engine/renderer/vulkan/vk_backend.h"
 
 #include "engine/core/application.h"
+
+#include "engine/define.h"
 #include "engine/core/logger.h"
 #include "engine/math/math_type.h"
 
+#include "engine/renderer/renderer_type.h"
 #include "engine/renderer/vulkan/vk_type.h"
 #include "engine/renderer/vulkan/vk_debug.h"
 #include "engine/renderer/vulkan/vk_utils.h"
@@ -12,14 +15,15 @@
 #include "engine/renderer/vulkan/vk_swapchain.h"
 #include "engine/renderer/vulkan/vk_renderpass.h"
 #include "engine/renderer/vulkan/vk_combuffer.h"
-#include "engine/renderer/vulkan/vk_framebuffer.h"
-#include "engine/renderer/vulkan/vk_fence.h"
 #include "engine/renderer/vulkan/vk_result.h"
 #include "engine/renderer/vulkan/vk_buffer.h"
 #include "engine/renderer/vulkan/vk_image.h"
 
-// Shaders
 #include "engine/renderer/vulkan/shaders/vk_material_shader.h"
+#include "engine/renderer/vulkan/shaders/vk_ui_shader.h"
+
+#include "engine/resources/resc_type.h"
+#include "engine/systems/material_sys.h"
 
 #include <vulkan/vulkan_core.h>
 
@@ -32,7 +36,7 @@ static uint32_t cache_framebuffer_height = 0;
 /* ========================================================================== */
 void upload_data(vulkan_context_t *ctx, VkCommandPool pool, VkFence fence,
                  VkQueue queue, vulkan_buffer_t *buffer, uint64_t offset,
-                 uint64_t size, void *data) {
+                 uint64_t size, const void *data) {
     VkBufferUsageFlags flags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
     vulkan_buffer_t staging;
@@ -45,45 +49,12 @@ void upload_data(vulkan_context_t *ctx, VkCommandPool pool, VkFence fence,
     vk_buffer_shut(ctx, &staging);
 }
 
-void draw_triangle(vulkan_context_t *ctx, VkCommandPool *pool, VkQueue *queues) {
-#define VERT_COUNT 4
-	vertex_3d verts[VERT_COUNT];
-	memory_zero(verts, sizeof(vertex_3d) * VERT_COUNT);
-
-	const float f = 10.0f;
-
-	// Top Left
-	verts[0].position.x = -0.5f * f;
-	verts[0].position.y = -0.5f * f;
-	verts[0].texcoord.x = 0.0f;
-	verts[0].texcoord.y = 0.0f;
-
-	// Bottom Right
-	verts[1].position.x = 0.5f * f;
-	verts[1].position.y = 0.5f * f;
-	verts[1].texcoord.x = 1.0f;
-	verts[1].texcoord.y = 1.0f;
-
-	// Bottom Left
-	verts[2].position.x = -0.5f * f;
-	verts[2].position.y = 0.5f * f;
-	verts[2].texcoord.x = 0.0f;
-	verts[2].texcoord.y = 1.0f;
-
-	// Top Right
-	verts[3].position.x = 0.5f * f;
-	verts[3].position.y = -0.5f * f;
-	verts[3].texcoord.x = 1.0f;
-	
-#define IDX_COUNT 6
-	uint32_t indices[IDX_COUNT] = {0, 1, 2, 0, 3, 1};
-
-    upload_data(ctx, *pool, 0, *queues, &ctx->obj_vert_buffer, 0,
-                sizeof(vertex_3d) * VERT_COUNT, verts);
-
-    upload_data(ctx, *pool, 0, *queues, &ctx->obj_idx_buffer, 0,
-                sizeof(uint32_t) * IDX_COUNT, indices);
-
+void free_data(vulkan_buffer_t *buffer, uint64_t offset, uint64_t size) {
+	(void)buffer;
+	(void)offset;
+	(void)size;
+	// TODO: Free in this buffer
+	// TODO: using free-list
 }
 
 int32_t find_mem_idx(uint32_t type_filter, uint32_t prop_flag) {
@@ -158,16 +129,43 @@ void command_buffer_init(render_backend_t *be) {
     ar_DEBUG("Vulkan Commandbuffer Created");
 }
 
-void regen_framebuffer(render_backend_t *be, vulkan_swapchain_t *swapchain,
-                       vulkan_renderpass_t *renderpass) {
-	(void)be;
-	for (uint32_t i = 0; i < swapchain->image_count; ++i) {
-		uint32_t attach_count = 2;
-        VkImageView attach[]     = {swapchain->image_view[i],
-                                    swapchain->image_attach.image_view};
+void regen_framebuffer(void) {
+    for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
+        /* World Pass */
+        VkImageView world_attach[2] =
+            {context.swapchain.image_view[i],
+             context.swapchain.image_attach.image_view};
+        VkFramebufferCreateInfo framebuffer_cr_info = {};
+        framebuffer_cr_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebuffer_cr_info.renderPass      = context.main_render.handle;
+        framebuffer_cr_info.attachmentCount = 2;
+        framebuffer_cr_info.pAttachments    = world_attach;
+        //framebuffer_cr_info.width           = context.framebuffer_w;
+        //framebuffer_cr_info.height          = context.framebuffer_h;
+        framebuffer_cr_info.width           = context.swapchain.extents.width;
+        framebuffer_cr_info.height          = context.swapchain.extents.height;
+        framebuffer_cr_info.layers          = 1;
 
-        vk_framebuffer_init(&context, renderpass, swapchain->extents, attach,
-                            attach_count, &context.swapchain.framebuffer[i]);
+        VK_CHECK(vkCreateFramebuffer(context.device.logic_dev,
+                                     &framebuffer_cr_info, context.alloc,
+                                     &context.world_framebuffer[i]));
+
+        /* UI Pass */
+        VkImageView ui_attach[1]           = {context.swapchain.image_view[i]};
+        VkFramebufferCreateInfo sc_fb_info = {};
+        sc_fb_info.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        sc_fb_info.renderPass      = context.ui_render.handle;
+        sc_fb_info.attachmentCount = 1;
+        sc_fb_info.pAttachments    = ui_attach;
+        //sc_fb_info.width           = context.framebuffer_w;
+        //sc_fb_info.height          = context.framebuffer_h;
+        sc_fb_info.width           = context.swapchain.extents.width;
+        sc_fb_info.height          = context.swapchain.extents.height;
+        sc_fb_info.layers          = 1;
+
+        VK_CHECK(vkCreateFramebuffer(context.device.logic_dev, &sc_fb_info,
+                                     context.alloc,
+                                     &context.swapchain.framebuffers[i]));
     }
 }
 
@@ -185,14 +183,12 @@ b8 recreate_swapchain(render_backend_t *be) {
 	context.recreate_swap = true;
 	vkDeviceWaitIdle(context.device.logic_dev);
 
-	//vk_image_view_shut(&context, &context.swapchain);
-	//vk_image_shut(&context, &context.swapchain.image_attach);
 	vk_swapchain_reinit(&context, &context.swapchain);
 	
 	context.framebuffer_w = cache_framebuffer_width;
 	context.framebuffer_h = cache_framebuffer_height;
-	context.main_render.extents.width = context.framebuffer_w;
-	context.main_render.extents.height = context.framebuffer_h;
+	context.main_render.render_area.z = context.framebuffer_w;
+	context.main_render.render_area.w = context.framebuffer_h;
 	cache_framebuffer_height = 0;
 	cache_framebuffer_width = 0;
 	context.framebuffer_last_gen = context.framebuffer_size_gen;
@@ -202,19 +198,56 @@ b8 recreate_swapchain(render_backend_t *be) {
                         &context.graphic_comm_buffer[i]);
     }
     for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
-        vk_framebuffer_shut(&context, &context.swapchain.framebuffer[i]);
+        vkDestroyFramebuffer(context.device.logic_dev,
+                             context.world_framebuffer[i], context.alloc);
+        vkDestroyFramebuffer(context.device.logic_dev,
+                             context.swapchain.framebuffers[i], context.alloc);
     }
 
-    context.main_render.extents.width = 0;
-	context.main_render.extents.height = 0;
-	context.main_render.extents.width = context.framebuffer_w;
-	context.main_render.extents.height = context.framebuffer_h;
+    /* World Renderpass */
+    context.main_render.render_area.x = 0;
+    context.main_render.render_area.y = 0;
+    context.main_render.render_area.z = context.framebuffer_w;
+    context.main_render.render_area.w = context.framebuffer_h;
 
-	regen_framebuffer(be, &context.swapchain, &context.main_render);
+    /* UI Renderpass */
+    context.ui_render.render_area.x = 0;
+    context.ui_render.render_area.y = 0;
+    context.ui_render.render_area.z = context.framebuffer_w;
+    context.ui_render.render_area.w = context.framebuffer_h;
+
+	regen_framebuffer();
 	command_buffer_init(be);
 	context.recreate_swap = false;
 
 	return true;
+}
+
+void vk_cmd_image_barrier_between_passes(VkCommandBuffer cmd, VkImage image) {
+    VkImageMemoryBarrier barrier = {};
+    barrier.sType                = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout            = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    barrier.newLayout            = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    barrier.srcQueueFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image                = image;
+    barrier.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel   = 0;
+    barrier.subresourceRange.levelCount     = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount     = 1;
+
+    // Source access mask: writing color attachment
+    barrier.srcAccessMask = 0;
+    // Destination access mask: reading/writing color attachment in next pass
+    barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+                            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    vkCmdPipelineBarrier(
+        cmd,
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // src stage
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // dst stage
+        0, 0, NULL, 0, NULL, 1, &barrier);
 }
 
 /* ========================================================================== */
@@ -288,21 +321,30 @@ b8 vk_backend_init(render_backend_t *backend, const char *name) {
 	vk_swapchain_init(&context, &context.swapchain);
 
 	/* ======================= Vulkan Renderpass ============================= */
-	vk_renderpass_init(&context, &context.main_render);
+    // World Render Layer
+    vk_renderpass_init(&context,
+                       (vec4){.x = 0, 0, context.framebuffer_w,
+                              context.framebuffer_h},
+                       (vec4){.x = 0.3f, 0.2f, 0.5f, 1.0f}, 1.0f, 0,
+                       CLEAR_COLOR_BUFFER | CLEAR_DEPTH_BUFFER |
+                           CLEAR_STENCIL_BUFFER,
+                       false, true, &context.main_render);
 
-	/* ======================= Vulkan Framebuffer ============================ */
-    context.swapchain.framebuffer =
-        dyn_array_reserved(vulkan_framebuffer_t, context.swapchain.image_count);
-	regen_framebuffer(backend, &context.swapchain, &context.main_render);
-	
+    // UI Render Layer
+    vk_renderpass_init(&context,
+                       (vec4){.x = 0, 0, context.framebuffer_w,
+                              context.framebuffer_h},
+                       (vec4){.x = 0.0f, 0.0f, 0.0f, 0.0f}, 1.0f, 0,
+                       CLEAR_NON_FLAG, true, false, &context.ui_render);
+
+    /* ======================= Vulkan Framebuffer ============================ */
+	regen_framebuffer();
     command_buffer_init(backend);
 	/* ======================== Vulkan Semaphore ============================= */
     context.avail_semaphore =
         dyn_array_reserved(VkSemaphore, context.swapchain.max_frame_in_flight);
     context.complete_semaphore =
         dyn_array_reserved(VkSemaphore, context.swapchain.max_frame_in_flight);
-    context.in_flight_fence =
-        dyn_array_reserved(vulkan_fence_t, context.swapchain.max_frame_in_flight);
 
 	for (uint8_t i = 0; i < context.swapchain.max_frame_in_flight; ++i) {
 		VkSemaphoreCreateInfo sm_info = {};
@@ -313,31 +355,33 @@ b8 vk_backend_init(render_backend_t *backend, const char *name) {
         vkCreateSemaphore(context.device.logic_dev, &sm_info, context.alloc,
                           &context.complete_semaphore[i]);
 
-        vk_fence_reset(&context, &context.in_flight_fence[i]);
-		vk_fence_init(&context, true, &context.in_flight_fence[i]);
-	}
+        VkFenceCreateInfo fence_info = {};
+        fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+        VK_CHECK(vkCreateFence(context.device.logic_dev, &fence_info,
+                               context.alloc, &context.in_flight_fence[i]));
+    }
 
-    context.image_in_flight =
-        dyn_array_reserved(vulkan_fence_t, context.swapchain.image_count);
     for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
         context.image_in_flight[i] = 0;
     }
 
-    if (!vk_material_shader_init(&context, &context.obj_shader)) {
-		ar_ERROR("Error loading Builtin shader");
+    /* Builtin Shaders */
+    if (!vk_material_shader_init(&context, &context.material_shader)) {
+		ar_ERROR("Error loading Builtin Material Shader");
 		return false;
 	}
 
+    if (!vk_ui_shader_init(&context, &context.ui_shader)) {
+        ar_ERROR("Error loading Builtin UI Shader");
+        return false;
+    }
+
 	buffer_init(&context);
 
-	ar_INFO("--Test Drawing Triangle");
-    draw_triangle(&context, &context.device.graphics_command_pool,
-                  &context.device.graphics_queue);
-
-	uint32_t obj_id = 0;
-	if (!vk_material_shader_acquire_rsc(&context, &context.obj_shader, &obj_id)) {
-		ar_ERROR("Failed to acquire shader resources");
-		return false;
+	/* Mark all geometries as INVALID_ID */
+	for (uint32_t i = 0; i < VULKAN_GEOMETRY_MAX_COUNT; ++i) {
+		context.geometries[i].id = INVALID_ID;
 	}
 
     ar_DEBUG("Vulkan API Granted Access Successfully");
@@ -360,7 +404,8 @@ void vk_backend_shut(render_backend_t *backend) {
 	vk_buffer_shut(&context, &context.obj_vert_buffer);
 
 	ar_DEBUG("Kill Vulkan Object Shaders");
-	vk_material_shader_shut(&context, &context.obj_shader);
+    vk_ui_shader_shut(&context, &context.ui_shader);
+	vk_material_shader_shut(&context, &context.material_shader);
 
     for (uint8_t i = 0; i < context.swapchain.max_frame_in_flight; ++i) {
         if (context.avail_semaphore[i]) {
@@ -374,16 +419,13 @@ void vk_backend_shut(render_backend_t *backend) {
                                context.complete_semaphore[i], context.alloc);
             context.complete_semaphore[i] = 0;
         }
-        vk_fence_shut(&context, &context.in_flight_fence[i]);
+        vkDestroyFence(context.device.logic_dev, context.in_flight_fence[i],
+                       context.alloc);
     }
     dyn_array_destroy(context.avail_semaphore);
 	dyn_array_destroy(context.complete_semaphore);
-	dyn_array_destroy(context.in_flight_fence);
-	dyn_array_destroy(context.image_in_flight);
 	context.avail_semaphore = 0;
 	context.complete_semaphore = 0;
-	context.in_flight_fence = 0;
-	context.image_in_flight = 0;
 
 	ar_DEBUG("Kill Vulkan Commandbuffer");
     for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
@@ -396,12 +438,16 @@ void vk_backend_shut(render_backend_t *backend) {
     dyn_array_destroy(context.graphic_comm_buffer);
 	context.graphic_comm_buffer = 0;
 
-	ar_DEBUG("Kill Vulkan Framebuffer");
-	for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
-		vk_framebuffer_shut(&context, &context.swapchain.framebuffer[i]);
-	}
+    ar_DEBUG("Kill Vulkan Framebuffer");
+    for (uint32_t i = 0; i < context.swapchain.image_count; ++i) {
+        vkDestroyFramebuffer(context.device.logic_dev,
+                             context.world_framebuffer[i], context.alloc);
+        vkDestroyFramebuffer(context.device.logic_dev,
+                             context.swapchain.framebuffers[i], context.alloc);
+    }
 
-	ar_DEBUG("Kill Vulkan Renderpass");
+    ar_DEBUG("Kill Vulkan Renderpass");
+    vk_renderpass_shut(&context, &context.ui_render);
 	vk_renderpass_shut(&context, &context.main_render);
 
 	ar_DEBUG("Kill Vulkan Swapchain");
@@ -441,6 +487,7 @@ b8 vk_backend_begin_frame(render_backend_t *backend, float delta_time) {
 	(void)backend;
 	context.frame_delta = delta_time;
 	
+    vkQueueWaitIdle(context.device.graphics_queue);
 	if (context.recreate_swap) {
 		VkResult result = vkDeviceWaitIdle(context.device.logic_dev);
 
@@ -473,14 +520,18 @@ b8 vk_backend_begin_frame(render_backend_t *backend, float delta_time) {
 	}
 
     /* Wait execution frame_in_flight */
-    if (!vk_fence_wait(&context,
-                       &context.in_flight_fence[context.current_frame],
-                       UINT64_MAX)) {
-        ar_WARNING("In-flight fence wait failed");
+    //vkQueueWaitIdle(context.device.graphics_queue);
+    VkResult result =
+        vkWaitForFences(context.device.logic_dev, 1,
+                        &context.in_flight_fence[context.current_frame], true,
+                        UINT64_MAX);
+    if (!vk_result_is_success(result)) {
+        ar_ERROR("In-flight fence wait failed. Error: %s",
+                 vk_result_string(result, true));
         return false;
     }
 
-	/* Get Next Image */
+    /* Get Next Image */
     if (!vk_swapchain_acquire_next_image(&context,
                                          context.avail_semaphore
                                              [context.current_frame],
@@ -488,7 +539,6 @@ b8 vk_backend_begin_frame(render_backend_t *backend, float delta_time) {
                                          &context.swapchain)) {
         return false;
     }
-
 
 	if (context.image_idx >= context.swapchain.image_count) {
         ar_ERROR("Invalid image index: %u", context.image_idx);
@@ -513,34 +563,41 @@ b8 vk_backend_begin_frame(render_backend_t *backend, float delta_time) {
 
 	VkRect2D scissor = {};
 	scissor.offset.x = scissor.offset.y = 0;
-	scissor.extent.width = context.swapchain.extents.width;
-	scissor.extent.height = context.swapchain.extents.height;
+	scissor.extent.width = context.framebuffer_w;
+	scissor.extent.height = context.framebuffer_h;
 	vkCmdSetViewport(combuff->handle, 0, 1, &viewport);
 	vkCmdSetScissor(combuff->handle, 0, 1, &scissor);
 
-	context.main_render.extents.width = context.framebuffer_w;
-	context.main_render.extents.height = context.framebuffer_h;
-
-    vk_renderpass_begin(combuff, &context.main_render,
-                        context.swapchain.framebuffer[context.image_idx]
-                            .handle);
+	context.main_render.render_area.z = context.framebuffer_w;
+	context.main_render.render_area.w = context.framebuffer_h;
 
     return true;
 }
 
-void vk_backend_update_global(mat4 projection, mat4 view, vec3 view_pos,
+void vk_backend_update_world(mat4 projection, mat4 view, vec3 view_pos,
                               vec4 ambient_color, int32_t mode) {
 	(void)view_pos;
 	(void)ambient_color;
 	(void)mode;
-	vk_material_shader_use(&context, &context.obj_shader);
-	context.obj_shader.global_ubo.projection = projection;
-	context.obj_shader.global_ubo.viewx = view;
+	vk_material_shader_use(&context, &context.material_shader);
+	context.material_shader.global_ubo.projection = projection;
+	context.material_shader.global_ubo.view = view;
 
 	// TODO: other UBO properties
 
-    vk_material_shader_update_global_state(&context, &context.obj_shader,
+    vk_material_shader_update_global_state(&context, &context.material_shader,
                                       context.frame_delta);
+}
+
+void vk_backend_update_ui(mat4 projection, mat4 view, int32_t mode) {
+    (void)mode;
+    vk_ui_shader_use(&context, &context.ui_shader);
+    context.ui_shader.global_ubo.projection = projection;
+    context.ui_shader.global_ubo.view = view;
+
+    // TODO: other UBO properties
+
+    vk_ui_shader_update_global(&context, &context.ui_shader, context.frame_delta);
 }
 
 b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
@@ -549,17 +606,24 @@ b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
 
     vulkan_commandbuffer_t *combuff =
         &context.graphic_comm_buffer[context.image_idx];
-    vk_renderpass_end(combuff);
+    //vk_renderpass_end(combuff);
     vk_combuff_end(combuff);
 
-    if (context.image_in_flight[context.image_idx] != VK_NULL_HANDLE) {
-        vk_fence_wait(&context, context.image_in_flight[context.image_idx],
-                      UINT64_MAX);
+    if (context.image_in_flight[context.image_idx] != 0) {
+        VkResult result =
+            vkWaitForFences(context.device.logic_dev, 1,
+                            context.image_in_flight[context.image_idx], true,
+                            UINT64_MAX);
+        if (!vk_result_is_success(result)) {
+            ar_FATAL("vkWaitForFences error: %s",
+                     vk_result_string(result, true));
+        }
     }
 
     context.image_in_flight[context.image_idx] =
         &context.in_flight_fence[context.current_frame];
-    vk_fence_reset(&context, &context.in_flight_fence[context.current_frame]);
+    VK_CHECK(vkResetFences(context.device.logic_dev, 1,
+                           &context.in_flight_fence[context.current_frame]));
 
     /* Begin Submit */
     VkSubmitInfo submit_info         = {};
@@ -579,7 +643,7 @@ b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
 
     VkResult result =
         vkQueueSubmit(context.device.graphics_queue, 1, &submit_info,
-                      context.in_flight_fence[context.current_frame].handle);
+                      context.in_flight_fence[context.current_frame]);
 
 	if (result != VK_SUCCESS) {
 		ar_ERROR("vkQueueSubmit error");
@@ -596,52 +660,82 @@ b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
     return true;
 }
 
-void vk_backend_update_obj(geo_render_data_t data) {
-	vk_material_shader_update_obj(&context, &context.obj_shader, data);
+b8 vk_backend_begin_renderpass(render_backend_t *be, uint8_t renderpass_id) {
+    (void)be;
+    vulkan_renderpass_t    *renderpass  = 0;
+    VkFramebuffer           framebuffer = 0;
+    vulkan_commandbuffer_t *combuff =
+        &context.graphic_comm_buffer[context.image_idx];
 
-	// TODO: Temporary Code Test
-	vk_material_shader_use(&context, &context.obj_shader);
-	VkDeviceSize offset[1] = {0};
+    // Choose renderpass ID
+    switch (renderpass_id) {
+    case RENDER_LAYER_WORLD:
+        renderpass  = &context.main_render;
+        framebuffer = context.world_framebuffer[context.image_idx];
+        break;
 
-    vkCmdBindDescriptorSets(context.graphic_comm_buffer[context.image_idx]
-                                .handle,
-                            VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            context.obj_shader.pipeline.pipe_layout, 0, 1,
-                            &context.obj_shader
-                                 .global_desc_sets[context.image_idx],
-                            0, NULL);
-    // Bind vertex
-    vkCmdBindVertexBuffers(context.graphic_comm_buffer[context.image_idx]
-                               .handle,
-                           0, 1, &context.obj_vert_buffer.handle,
-                           (VkDeviceSize *)offset);
-    // Bind indices
-    vkCmdBindIndexBuffer(context.graphic_comm_buffer[context.image_idx].handle,
-                         context.obj_idx_buffer.handle, 0,
-                         VK_INDEX_TYPE_UINT32);
+    case RENDER_LAYER_UI:
+        renderpass  = &context.ui_render;
+        framebuffer = context.swapchain.framebuffers[context.image_idx];
+        break;
 
-    // draw
-    vkCmdDrawIndexed(context.graphic_comm_buffer[context.image_idx].handle,
-                     IDX_COUNT, 1, 0, 0, 0);
+    default:
+        ar_ERROR("vk_backend_begin_renderpass - called on unrecognized ID: "
+                 "%#02x", renderpass_id);
+        return false;
+    }
+
+    vk_renderpass_begin(combuff, renderpass, framebuffer);
+
+    switch (renderpass_id) {
+    case RENDER_LAYER_WORLD:
+        vk_material_shader_use(&context, &context.material_shader);
+        break;
+
+    case RENDER_LAYER_UI:
+        vk_ui_shader_use(&context, &context.ui_shader);
+        break;
+    }
+    
+    return true;
 }
 
-void vk_backend_tex_init(const char *name, int32_t width,
-                         int32_t height, int32_t channel_count,
-                         const uint8_t *pixel, b8 has_transparent,
-                         texture_t *texture) {
-	(void)name;
-	texture->width = (uint32_t)width;
-	texture->height = (uint32_t)height;
-	texture->channel_count = channel_count;
+b8 vk_backend_end_renderpass(render_backend_t *be, uint8_t renderpass_id) {
+    (void)be;
+    vulkan_renderpass_t *renderpass = 0;
+    vulkan_commandbuffer_t *combuff =
+        &context.graphic_comm_buffer[context.image_idx];
+
+    // Choose renderpass ID
+    switch (renderpass_id) {
+    case RENDER_LAYER_WORLD:
+        renderpass = &context.main_render;
+        break;
+
+    case RENDER_LAYER_UI:
+        renderpass = &context.ui_render;
+        break;
+
+    default:
+        ar_ERROR("vk_backend_end_renderpass - called on unrecognized ID: "
+                 "%#02x", renderpass_id);
+        return false;
+    }
+
+    vk_renderpass_end(combuff, renderpass);
+    return true;
+}
+
+void vk_backend_tex_init(const uint8_t *pixel, texture_t *texture) {
 	texture->gen = INVALID_ID;
 
 	// TODO: use an allocator
-    texture->interal_data =
+    texture->internal_data =
         (vulkan_texture_data_t *)memory_alloc(sizeof(vulkan_texture_data_t),
                                               MEMTAG_TEXTURE);
     vulkan_texture_data_t *data =
-        (vulkan_texture_data_t *)texture->interal_data;
-	VkDeviceSize image_size = (uint64_t)width * (uint64_t)height * (uint64_t)channel_count;
+        (vulkan_texture_data_t *)texture->internal_data;
+	VkDeviceSize image_size = texture->width * texture->height * texture->channel_count;
 
 	// NOTE: assume 8-bit per channel.
 	VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -655,7 +749,7 @@ void vk_backend_tex_init(const char *name, int32_t width,
 	vk_buffer_load_data(&context, &staging, 0, image_size, 0, pixel);
 
     vk_image_init(&context, VK_IMAGE_TYPE_2D, image_format,
-                  VK_IMAGE_TILING_OPTIMAL, (uint32_t)width, (uint32_t)height,
+                  VK_IMAGE_TILING_OPTIMAL, texture->width, texture->height,
                   VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                       VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                       VK_IMAGE_USAGE_SAMPLED_BIT |
@@ -714,7 +808,6 @@ void vk_backend_tex_init(const char *name, int32_t width,
         return;
     }
 
-	texture->has_transparent = has_transparent;
 	texture->gen++;
 }
 
@@ -722,7 +815,7 @@ void vk_backend_tex_shut(texture_t *texture) {
     vkDeviceWaitIdle(context.device.logic_dev);
 
     vulkan_texture_data_t *data =
-        (vulkan_texture_data_t *)texture->interal_data;
+        (vulkan_texture_data_t *)texture->internal_data;
 
     if (data) {
         vk_image_shut(&context, &data->image);
@@ -731,9 +824,230 @@ void vk_backend_tex_shut(texture_t *texture) {
         vkDestroySampler(context.device.logic_dev, data->sampler,
                          context.alloc);
         data->sampler = 0;
-        memory_free(texture->interal_data, sizeof(vulkan_texture_data_t),
+        memory_free(texture->internal_data, sizeof(vulkan_texture_data_t),
                     MEMTAG_TEXTURE);
     }
 
     memory_zero(texture, sizeof(texture_t));
+}
+
+b8 vk_backend_material_init(material_t *material) {
+    if (material) {
+        switch (material->type) {
+        case MATERIAL_TYPE_WORLD:
+            if (!vk_material_shader_acquire_rsc(&context,
+                                                &context.material_shader,
+                                                material)) {
+                ar_ERROR("vK_renderer_material_init - Failed to acquire world "
+                         "shader.");
+                return false;
+            }
+            break;
+
+        case MATERIAL_TYPE_UI:
+            if (!vk_ui_shader_acquire_resc(&context, &context.ui_shader,
+                                           material)) {
+                ar_ERROR(
+                    "vK_renderer_material_init - Failed to acquire UI shader.");
+                return false;
+            }
+            break;
+        default:
+            ar_ERROR("vk_backend_material_init - unknown material type.");
+            return false;
+        }
+
+        ar_TRACE("Renderer: Material created.");
+        return true;
+    }
+
+    ar_ERROR("vulkan_renderer_create_material called with nullptr. Creation "
+             "failed.");
+    return false;
+}
+
+void vk_backend_material_shut(material_t *material) {
+    if (material) {
+        if (material->internal_id != INVALID_ID) {
+            switch (material->type) {
+            case MATERIAL_TYPE_WORLD:
+                vk_material_shader_release_rsc(&context,
+                                               &context.material_shader,
+                                               material);
+                break;
+
+            case MATERIAL_TYPE_UI:
+                vk_ui_shader_release_resc(&context, &context.ui_shader,
+                                          material);
+                break;
+            }
+        } else {
+            ar_WARNING("vk_backend_material_shut called with "
+                       "internal_id=INVALID_ID. Nothing was done");
+        }
+    } else {
+        ar_WARNING(
+            "vk_backend_material_shut called with nullptr. Nothing was done");
+    }
+}
+
+b8 vk_backend_geometry_init(geometry_t *geometry, uint32_t vertex_size, uint32_t vertex_count,
+                            const void *vertices, uint32_t idx_size, uint32_t idx_count,
+                            const void *indices) {
+    if (!vertex_count || !vertices) {
+        ar_ERROR("vk_backend_geometry_init - require vertex data, none was "
+                 "supplied. vertex_count=%d, vertices=%p",
+                 vertex_count, vertices);
+        return false;
+    }
+
+    // Check if this was re-upload.
+    b8                 is_reupload = geometry->internal_id != INVALID_ID;
+    vulkan_geo_data_t  old_data;
+    vulkan_geo_data_t *internal_data = 0;
+
+    if (is_reupload) {
+        internal_data              = &context.geometries[geometry->internal_id];
+
+        // take copy of old data
+        old_data.idx_buffer_offset = internal_data->idx_buffer_offset;
+        old_data.idx_count         = internal_data->idx_count;
+        old_data.idx_element_size  = internal_data->idx_element_size;
+        old_data.vertex_buffer_offset = internal_data->vertex_buffer_offset;
+        old_data.vertex_count         = internal_data->vertex_count;
+        old_data.vertex_element_size  = internal_data->vertex_element_size;
+    } else {
+        for (uint32_t i = 0; i < VULKAN_GEOMETRY_MAX_COUNT; ++i) {
+            if (context.geometries[i].id == INVALID_ID) {
+                geometry->internal_id    = i;
+                context.geometries[i].id = i;
+                internal_data            = &context.geometries[i];
+                break;
+            }
+        }
+    }
+
+    if (!internal_data) {
+        ar_FATAL("vk_backend_geometry_init - failed to find free index for "
+                 "geometry upload. Adjust config to allow more");
+        return false;
+    }
+
+    VkCommandPool pool                  = context.device.graphics_command_pool;
+    VkQueue       queue                 = context.device.graphics_queue;
+
+    /* Vertex Data */
+    internal_data->vertex_buffer_offset = context.geo_vert_offset;
+    internal_data->vertex_count         = vertex_count;
+    internal_data->vertex_element_size  = sizeof(vertex_3d);
+	uint32_t total_size = vertex_count * vertex_size;
+    upload_data(&context, pool, 0, queue, &context.obj_vert_buffer,
+                internal_data->vertex_buffer_offset, total_size,
+                vertices);
+    // TODO: using free list instead of this.
+    context.geo_vert_offset += total_size;
+
+    if (idx_count && indices) {
+        internal_data->idx_buffer_offset = context.geo_idx_offset;
+        internal_data->idx_count         = idx_count;
+        internal_data->idx_element_size  = sizeof(uint32_t);
+		total_size = idx_count * idx_size;
+        upload_data(&context, pool, 0, queue, &context.obj_idx_buffer,
+                    internal_data->idx_buffer_offset, total_size,
+                    indices);
+        // TODO: using free list intead of this.
+        context.geo_idx_offset += total_size;
+    }
+
+    if (internal_data->gen == INVALID_ID) {
+        internal_data->gen = 0;
+    } else {
+        internal_data->gen++;
+    }
+
+    if (is_reupload) {
+		// Vertex Data 
+        free_data(&context.obj_vert_buffer, old_data.vertex_buffer_offset,
+                  old_data.vertex_element_size * old_data.vertex_count);
+
+        if (old_data.idx_element_size > 0) {
+			// Index Data
+            free_data(&context.obj_idx_buffer, old_data.idx_buffer_offset,
+                      old_data.idx_element_size * old_data.idx_count);
+        }
+    }
+
+    return true;
+}
+
+void vk_backend_geometry_shut(geometry_t *geometry) {
+    if (geometry && geometry->internal_id != INVALID_ID) {
+        vkDeviceWaitIdle(context.device.logic_dev);
+        vulkan_geo_data_t *internal_data =
+            &context.geometries[geometry->internal_id];
+
+        /* Free Vertex Data */
+        free_data(&context.obj_vert_buffer, internal_data->vertex_buffer_offset,
+                  internal_data->vertex_element_size * internal_data->vertex_count);
+
+        /* Free Index Data */
+        if (internal_data->idx_element_size > 0) {
+            free_data(&context.obj_idx_buffer, internal_data->idx_buffer_offset,
+                      internal_data->idx_element_size * internal_data->idx_count);
+        }
+
+        memory_zero(internal_data, sizeof(vulkan_geo_data_t));
+        internal_data->id  = INVALID_ID;
+        internal_data->gen = INVALID_ID;
+    }
+}
+
+void vk_backend_geo_render(geo_render_data_t data) {
+    if (data.geometry && data.geometry->internal_id == INVALID_ID) {
+        return;
+    }
+
+    vulkan_geo_data_t *buffer_data =
+        &context.geometries[data.geometry->internal_id];
+    vulkan_commandbuffer_t *combuff =
+        &context.graphic_comm_buffer[context.image_idx];
+
+    material_t *m = 0;
+    if (data.geometry->material) {
+        m = data.geometry->material;
+    } else {
+        m = material_sys_get_default();
+    }
+
+    switch (m->type) {
+        case MATERIAL_TYPE_WORLD:
+        vk_material_shader_set_model(&context, &context.material_shader, data.model);
+        vk_material_shader_apply(&context, &context.material_shader, m);
+        break;
+
+        case MATERIAL_TYPE_UI:
+        vk_ui_shader_set_model(&context, &context.ui_shader, data.model);
+        vk_ui_shader_apply_material(&context, &context.ui_shader, m);
+        break;
+
+        default:
+        ar_ERROR("vk_backend_geo_render - unknown material type: %i", m->type);
+        return;
+    }
+
+    VkDeviceSize offset[1] = {buffer_data->vertex_buffer_offset};
+    vkCmdBindVertexBuffers(combuff->handle, 0, 1,
+                           &context.obj_vert_buffer.handle,
+                           (VkDeviceSize *)offset);
+
+    // Draw
+    if (buffer_data->idx_count > 0) {
+        vkCmdBindIndexBuffer(combuff->handle, context.obj_idx_buffer.handle,
+                             buffer_data->idx_buffer_offset,
+                             VK_INDEX_TYPE_UINT32);
+
+        vkCmdDrawIndexed(combuff->handle, buffer_data->idx_count, 1, 0, 0, 0);
+    } else {
+        vkCmdDraw(combuff->handle, buffer_data->vertex_count, 1, 0, 0);
+    }
 }

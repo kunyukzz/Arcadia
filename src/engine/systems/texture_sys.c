@@ -2,20 +2,10 @@
 
 #include "engine/container/hashtable.h"
 #include "engine/core/logger.h"
-#include "engine/core/strings.h"
+#include "engine/core/ar_strings.h"
 #include "engine/memory/memory.h"
 #include "engine/renderer/renderer_fe.h"
-
-// TODO: resource loader
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsign-conversion"
-#pragma GCC diagnostic ignored "-Wconversion"
-#pragma clang diagnostic ignored "-Wcast-align"
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "engine/include/stb_image.h"
-
-#pragma clang diagnostic pop
+#include "engine/systems/resource_sys.h"
 
 typedef struct texture_sys_state_t {
 	texture_sys_config_t config;
@@ -67,86 +57,80 @@ b8 default_texture_init(texture_sys_state_t *state) {
         }
     }
 
-    renderer_tex_init(DEFAULT_TEXTURE_NAME, tex_dimension, tex_dimension,
-                      4, pixels, false, &p_state->default_texture);
+    string_ncopy(state->default_texture.name, DEFAULT_TEXTURE_NAME,
+                 TEXTURE_NAME_MAX_LENGTH);
+    state->default_texture.gen             = INVALID_ID;
+    state->default_texture.width           = tex_dimension;
+    state->default_texture.height          = tex_dimension;
+    state->default_texture.channel_count   = 4;
+    state->default_texture.has_transparent = false;
+    renderer_tex_init(pixels, &state->default_texture);
 
     state->default_texture.gen = INVALID_ID;
     return true;
 }
 
+void texture_shut(texture_t *t) {
+	renderer_tex_shut(t);
+
+	memory_zero(t->name, sizeof(char) * TEXTURE_NAME_MAX_LENGTH);
+	memory_zero(t, sizeof(texture_t));
+
+	t->id = INVALID_ID;
+	t->gen = INVALID_ID;
+}
+
 void default_texture_shut(texture_sys_state_t *state) {
 	if (state) {
-		renderer_tex_shut(&state->default_texture);
+		texture_shut(&state->default_texture);
 	}
 }
 
 b8 load_texture(const char *texture_name, texture_t *tx) {
-    // TODO: Should be able to located anywhere.
-    char         *format_str        = "assets/textures/%s.%s";
-    const int32_t req_channel_count = 4;
-    stbi_set_flip_vertically_on_load(true);
-    char full_file_path[512];
+	resource_t image_resc;
+	if (!resource_sys_load(texture_name, RESC_TYPE_IMAGE, &image_resc)) {
+		ar_ERROR("Failed to load image resource for texture '%s'", texture_name);
+		return false;
+	}
 
-    // try different extension.
-    string_format(full_file_path, format_str, texture_name, "png");
-
+	image_resc_data_t *resc_data = image_resc.data;
     texture_t temp;
-    uint8_t  *data =
-        stbi_load(full_file_path, (int32_t *)&temp.width,
-                  (int32_t *)&temp.height, (int32_t *)&temp.channel_count,
-                  req_channel_count);
+	temp.width = resc_data->width;
+	temp.height = resc_data->height;
+	temp.channel_count = resc_data->channel_count;
+	
+	uint32_t curr_gen = tx->gen;
+	tx->gen = INVALID_ID;
 
-    temp.channel_count = req_channel_count;
+	uint64_t total_size = temp.width * temp.height * temp.channel_count;
+	int has_transparent = false;
+	for (uint64_t i = 0; i < total_size; ++i) {
+		uint8_t a =resc_data->pixels[i + 3];
 
-    if (data) {
-        uint32_t curr_gen   = tx->gen;
-        tx->gen             = INVALID_ID;
+		if (a < 255) {
+			has_transparent = true;
+			break;
+		}
+	}
 
-        uint64_t total_size = temp.width * temp.height * req_channel_count;
+    // acquire internal texture resource & upload to gpu.
+	string_ncopy(temp.name, texture_name, TEXTURE_NAME_MAX_LENGTH);
+	temp.gen = INVALID_ID;
+	temp.has_transparent = has_transparent;
+	renderer_tex_init(resc_data->pixels, &temp);
 
-        // check transparent
-        int has_transparent = false;
-        for (uint64_t i = 0; i < total_size; i += req_channel_count) {
-            uint8_t a = data[i + 3];
-            if (a < 255) {
-                has_transparent = true;
-                break;
-            }
-        }
-        (void)has_transparent;
+	texture_t old = *tx;
+	*tx           = temp;
 
-        if (stbi_failure_reason()) {
-            ar_WARNING("load_texture() failed to load file '%s' : '%s'",
-                       full_file_path, stbi_failure_reason());
-        }
+	renderer_tex_shut(&old);
+	if (curr_gen == INVALID_ID) {
+		tx->gen = 0;
+	} else {
+		tx->gen = curr_gen + 1;
+	}
 
-        // acquire internal texture resource & upload to gpu.
-        renderer_tex_init("Default", (int32_t)temp.width,
-                          (int32_t)temp.height, temp.channel_count, data, false,
-                          &temp);
-
-        texture_t old = *tx;
-        *tx           = temp;
-
-        renderer_tex_shut(&old);
-        if (curr_gen == INVALID_ID) {
-            tx->gen = 0;
-        } else {
-            tx->gen = curr_gen + 1;
-        }
-
-        // clean up
-        ar_TRACE("Load Texture");
-        stbi_image_free(data);
-        return true;
-    } else {
-        if (stbi_failure_reason()) {
-            ar_WARNING("load_texture() failed to load file '%s' : '%s'",
-                       full_file_path, stbi_failure_reason());
-        }
-
-        return false;
-    }
+	resource_sys_unload(&image_resc);
+	return true;
 }
 /* ========================================================================== */
 /* ========================================================================== */
@@ -171,11 +155,11 @@ b8 texture_sys_init(uint64_t *memory_require, void *state,
     p_state->config       = config;
 
     // Array block is after state. Just set pointer
-    void *array_block     = (uint8_t *)state + struct_req;
+    void *array_block     = (char *)state + struct_req;
     p_state->reg_textures = array_block;
 
     // Hash block is after array
-    void *hash_block      = (uint8_t *)array_block + array_req;
+    void *hash_block      = (char *)array_block + array_req;
 
     hashtable_init(sizeof(texture_ref_t), config.max_texture_count, hash_block,
                    false, &p_state->reg_texture_table);
@@ -282,27 +266,26 @@ void texture_sys_release(const char *name) {
             return;
         }
 
+		char name_copy[TEXTURE_NAME_MAX_LENGTH];
+		string_ncopy(name_copy, name, TEXTURE_NAME_MAX_LENGTH);
+
         ref.ref_count--;
         if (ref.ref_count == 0 && ref.auto_release) {
             texture_t *tt = &p_state->reg_textures[ref.handle];
 
-            renderer_tex_shut(tt);
-
-            memory_zero(tt, sizeof(texture_t));
-            tt->id           = INVALID_ID;
-            tt->gen          = INVALID_ID;
+			texture_shut(tt);
 
             ref.handle       = INVALID_ID;
             ref.auto_release = false;
             ar_TRACE("Release texture '%s'. Ref_count=0 and auto_release=true",
-                     name);
+                     name_copy);
         } else {
             ar_TRACE("Release texture '%s'. Ref_count=%i and auto_release=%s",
-                     name, ref.ref_count, ref.auto_release ? "true" : "false");
+                     name_copy, ref.ref_count, ref.auto_release ? "true" : "false");
         }
 
         /* Update Entry */
-        hashtable_set(&p_state->reg_texture_table, name, &ref);
+        hashtable_set(&p_state->reg_texture_table, name_copy, &ref);
     } else {
         ar_ERROR("Texture system failed to release texture '%s'", name);
     }
@@ -311,6 +294,7 @@ void texture_sys_release(const char *name) {
 texture_t *texture_sys_get_default_tex(void) {
     if (p_state) {
         return &p_state->default_texture;
+        ar_INFO("Use default texture");
     }
 
     ar_ERROR("get_default_tex was called before texture system initialized. "

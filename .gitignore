@@ -1,5 +1,6 @@
 bin/
 obj/
+*.spv
 compile_commands.json
 console.log
 .cache/
