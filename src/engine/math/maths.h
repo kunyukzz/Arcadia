@@ -471,6 +471,7 @@ _arinline mat4 mat4_ortho(float left, float right, float bottom, float top,
 	result.data[12] = (left + right) * lr;
 	result.data[13] = (top - bottom) * bt;
 	result.data[14] = (far - near) * nf;
+	result.data[15] = 1.0f;
 
 #elif defined(AR_USE_ROW_MAJOR)
     float lr = 1.0f / (right - left);

@@ -52,6 +52,7 @@ typedef struct application_state_t {
 
 	// TODO: Temporary
 	geometry_t *test_geo;
+	geometry_t *test_ui_geo;
 
 } application_state_t;
 
@@ -292,10 +293,54 @@ b8 application_init(struct game_entry *game_inst) {
         geometry_sys_gen_plane_config(10.0f, 5.0f, 5, 5, 5.0f, 2.0f,
                                       "test geometry", "test_material");
 
-    p_state->test_geo = geometry_sys_get_default();
+    p_state->test_geo = geometry_sys_acquire_by_config(gc, true);
 
     memory_free(gc.vertices, sizeof(vertex_3d) * gc.vertex_count, MEMTAG_GAME);
 	memory_free(gc.indices, sizeof(uint32_t) * gc.idx_count, MEMTAG_GAME);
+
+	/* Load Test UI */
+	geo_config_t ui_config;
+	ui_config.vertex_size = sizeof(vertex_2d);
+	ui_config.vertex_count = 4;
+	ui_config.idx_size = sizeof(uint32_t);
+	ui_config.idx_count = 6;
+	string_ncopy(ui_config.material_name, "test_ui_material", MATERIAL_NAME_MAX_LENGTH);
+	string_ncopy(ui_config.name, "test_ui_geometry", GEOMETRY_NAME_MAX_LENGTH);
+
+	const float f = 512.0f;
+    vertex_2d uiverts [4];
+
+	// Top Left
+    uiverts[0].position.x = 0.0f;  // 0    3
+    uiverts[0].position.y = 0.0f;  //
+    uiverts[0].texcoord.x = 0.0f;  //
+    uiverts[0].texcoord.y = 0.0f;  // 2    1
+
+	// Bottom Right
+    uiverts[1].position.y = f;
+    uiverts[1].position.x = f;
+    uiverts[1].texcoord.x = 1.0f;
+    uiverts[1].texcoord.y = 1.0f;
+
+	// Bottom Left
+    uiverts[2].position.x = 0.0f;
+    uiverts[2].position.y = f;
+    uiverts[2].texcoord.x = 0.0f;
+    uiverts[2].texcoord.y = 1.0f;
+
+	// Top Right
+    uiverts[3].position.x = f;
+    uiverts[3].position.y = 0.0;
+    uiverts[3].texcoord.x = 1.0f;
+    uiverts[3].texcoord.y = 0.0f;
+    ui_config.vertices = uiverts;
+
+    // Indices - counter-clockwise
+    uint32_t uiindices[6] = {0, 1, 2, 0, 3, 1};
+    //uint32_t uiindices[6] = {2, 1, 0, 3, 0, 1};
+    ui_config.indices = uiindices;
+	p_state->test_ui_geo = geometry_sys_acquire_by_config(ui_config, true);
+
 	// TODO: End Temporary
 
 	/* game start */
@@ -358,9 +403,14 @@ b8 application_run(void) {
 			geo_render_data_t test_render;
 			test_render.geometry = p_state->test_geo;
 			test_render.model = mat4_identity();
-
 			packet.geo_count = 1;
 			packet.geometries = &test_render;
+
+			geo_render_data_t test_ui_render;
+			test_ui_render.geometry = p_state->test_ui_geo;
+			test_ui_render.model = mat4_translate(vec3_zero());
+			packet.ui_geo_count = 1;
+			packet.ui_geometries = &test_ui_render;
 
 			renderer_draw_frame(&packet);
 

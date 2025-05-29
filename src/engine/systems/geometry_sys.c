@@ -6,7 +6,6 @@
 
 #include "engine/renderer/renderer_fe.h"
 #include "engine/systems/material_sys.h"
-#include <stdint.h>
 
 typedef struct geo_ref_t {
 	uint64_t ref_count;

@@ -5,14 +5,14 @@
 #include "engine/math/math_type.h"
 #include "engine/renderer/vulkan/vk_result.h"
 
-b8 vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
-                    uint32_t                           attr_count,
-                    VkVertexInputAttributeDescription *attr,
-                    uint32_t                           set_layout_count,
-                    VkDescriptorSetLayout *set_layout, uint32_t stg_count,
-                    VkPipelineShaderStageCreateInfo *stg, VkViewport viewport,
-                    VkRect2D scissor, b8 is_wireframe,
-                    vulkan_pipeline_t *pipeline) {
+b8   vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
+                      uint32_t attr_count, uint32_t stride,
+                      uint32_t set_layout_count, uint32_t stg_count,
+                      VkVertexInputAttributeDescription *attr,
+                      VkDescriptorSetLayout             *set_layout,
+                      VkPipelineShaderStageCreateInfo *stg, VkViewport viewport,
+                      VkRect2D scissor, b8 is_wireframe, b8 depth_enable,
+                      vulkan_pipeline_t *pipeline) {
     (void)viewport;
 	(void)scissor;
 	/* Viewport State */
@@ -53,11 +53,13 @@ b8 vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
 	VkPipelineDepthStencilStateCreateInfo depth_stc_info = {};
     depth_stc_info.sType =
         VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depth_stc_info.depthTestEnable       = VK_TRUE;
-    depth_stc_info.depthWriteEnable      = VK_TRUE;
-    depth_stc_info.depthCompareOp        = VK_COMPARE_OP_LESS;
-    depth_stc_info.depthBoundsTestEnable = VK_FALSE;
-    depth_stc_info.stencilTestEnable     = VK_FALSE;
+	if (depth_enable) {
+		depth_stc_info.depthTestEnable       = VK_TRUE;
+		depth_stc_info.depthWriteEnable      = VK_TRUE;
+		depth_stc_info.depthCompareOp        = VK_COMPARE_OP_LESS;
+		depth_stc_info.depthBoundsTestEnable = VK_FALSE;
+		depth_stc_info.stencilTestEnable     = VK_FALSE;
+	}
 
     /* Color Blend */
 	VkPipelineColorBlendAttachmentState blend_attach;
@@ -96,7 +98,7 @@ b8 vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
     VkVertexInputBindingDescription bind_desc;
     bind_desc.binding   = 0;
     bind_desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    bind_desc.stride    = sizeof(vertex_3d);
+    bind_desc.stride    = stride;
 
     /* Attributes */
     VkPipelineVertexInputStateCreateInfo vert_info = {};
@@ -144,7 +146,7 @@ b8 vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
     pipeline_info.pViewportState      = &vw_info;
     pipeline_info.pRasterizationState = &raster_info;
     pipeline_info.pMultisampleState   = &mlt_info;
-    pipeline_info.pDepthStencilState  = &depth_stc_info;
+    pipeline_info.pDepthStencilState  = depth_enable ? &depth_stc_info : 0;
     pipeline_info.pColorBlendState    = &blend_info;
     pipeline_info.pDynamicState       = &dyn_info;
     pipeline_info.pTessellationState  = 0;

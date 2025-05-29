@@ -19,7 +19,13 @@ typedef struct vulkan_image_t {
 /* ========================= Vulkan Renderpass ============================== */
 typedef struct vulkan_renderpass_t {
 	VkRenderPass handle;
-	VkExtent2D extents;
+	vec4 render_area;
+	vec4 clear_color;
+	float depth;
+	uint32_t stencil;
+	uint8_t clear_flags;
+	b8 has_prev_pass;
+	b8 has_next_pass;
 } vulkan_renderpass_t;
 
 /* ======================== Vulkan Commandbuffer ============================ */
@@ -31,13 +37,6 @@ typedef enum vulkan_combuff_state_t {
     _STATE_SUBMITTED,
     _STATE_NOT_ALLOCATED
 } vulkan_combuff_state_t;
-
-typedef struct vulkan_framebuffer_t {
-	VkFramebuffer handle;
-	vulkan_renderpass_t *renderpass;
-	uint32_t attach_count;
-	VkImageView *attach;
-} vulkan_framebuffer_t;
 
 typedef struct vulkan_commandbuffer_t {
 	VkCommandBuffer handle;
@@ -60,16 +59,11 @@ typedef struct vulkan_swapchain_t {
 	VkImageView *image_view;
 	VkExtent2D extents;
 	vulkan_image_t image_attach;
-	vulkan_framebuffer_t *framebuffer;
+	VkFramebuffer framebuffers[4];
 
 	uint32_t image_count;
 	uint8_t max_frame_in_flight;
 } vulkan_swapchain_t;
-
-typedef struct vulkan_fence_t {
-	VkFence handle;
-	b8 is_signaled;
-} vulkan_fence_t;
 
 /* ============================ Vulkan Device =============================== */
 typedef struct vulkan_device_t {
@@ -112,22 +106,89 @@ typedef struct vulkan_buffer_t {
 	uint32_t mem_prop_flag;
 } vulkan_buffer_t;
 
-/* =========================== Vulkan Shaders =============================== */
+/* ========================== Vulkan UI Shaders ============================= */
+typedef struct vulkan_desc_state_t {
+	uint32_t gen[4];
+	uint32_t id[4];
+} vulkan_desc_state_t;
+
 typedef struct vulkan_shader_stage_t {
 	VkShaderModuleCreateInfo cr_info;
 	VkShaderModule handle;
 	VkPipelineShaderStageCreateInfo shader_stg_cr_info;
 } vulkan_shader_stage_t;
 
+/* This for UI shaders */
+#define UI_SHADER_STAGE_COUNT 2
+#define VULKAN_UI_SHADER_DESC_COUNT 2
+#define VULKAN_UI_SHADER_SAMPLER_COUNT 1
+#define VULKAN_UI_MAX_COUNT 1024
+
+typedef struct vulkan_ui_shader_state_t {
+	VkDescriptorSet desc_sets[4];
+	vulkan_desc_state_t desc_states[VULKAN_UI_SHADER_DESC_COUNT];
+} vulkan_ui_shader_state_t;
+
+typedef struct vulkan_ui_shader_global_ubo_t {
+    mat4 projection;   // 64 bytes
+    mat4 view;         // 64 bytes
+    mat4 m_reserved0;  // 64 bytes, reserved for future use
+    mat4 m_reserved1;  // 64 bytes, reserved for future use
+} vulkan_ui_shader_global_ubo_t;
+
+typedef struct vulkan_ui_shader_instance_ubo_t {
+    vec4 diffuse_color;  // 16 bytes
+    vec4 v_reserved0;    // 16 bytes, reserved for future use
+    vec4 v_reserved1;    // 16 bytes, reserved for future use
+    vec4 v_reserved2;    // 16 bytes, reserved for future use
+} vulkan_ui_shader_instance_ubo_t;
+
+typedef struct vulkan_ui_shader_t {
+	vulkan_shader_stage_t stages[UI_SHADER_STAGE_COUNT];
+
+	/* Global */
+	VkDescriptorPool global_desc_pool;
+	VkDescriptorSetLayout global_desc_set_layout;
+	VkDescriptorSet global_desc_sets[4];
+	vulkan_buffer_t global_uni_buffer;
+
+	/* Object */
+	VkDescriptorPool obj_desc_pool;
+	VkDescriptorSetLayout obj_desc_set_layout;
+	vulkan_buffer_t obj_uni_buffer;
+
+	vulkan_ui_shader_global_ubo_t global_ubo;
+
+	uint32_t obj_uniform_buffer_idx;
+
+	texture_use_t sampler_uses[VULKAN_UI_SHADER_SAMPLER_COUNT];
+
+	vulkan_ui_shader_state_t instance_states[VULKAN_UI_MAX_COUNT];
+	vulkan_pipeline_t pipeline;
+
+	b8 desc_updated[4];
+} vulkan_ui_shader_t;
+
+/* =========================== Vulkan Shaders =============================== */
+/* This for world & object shaders */
 #define MATERIAL_SHADER_STAGE_COUNT 2
 #define VULKAN_MATERIAL_SHADER_DESC_COUNT 2
 #define VULKAN_MATERIAL_SHADER_SAMPLER_COUNT 1
 #define VULKAN_MATERIAL_MAX_COUNT 1024
 
-typedef struct vulkan_desc_state_t {
-	uint32_t gen[4];
-	uint32_t id[4];
-} vulkan_desc_state_t;
+typedef struct vulkan_material_shader_global_ubo_t {
+    mat4 projection;   // 64 bytes
+    mat4 view;         // 64 bytes
+    mat4 m_reserved0;  // 64 bytes, reserved for future use
+    mat4 m_reserved1;  // 64 bytes, reserved for future use
+} vulkan_material_shader_global_ubo_t;
+
+typedef struct vulkan_material_shader_instance_ubo_t {
+    vec4 diffuse_color;  // 16 bytes
+    vec4 v_reserved0;    // 16 bytes, reserved for future use
+    vec4 v_reserved1;    // 16 bytes, reserved for future use
+    vec4 v_reserved2;    // 16 bytes, reserved for future use
+} vulkan_material_shader_instance_ubo_t;
 
 typedef struct vulkan_material_shader_state_t {
 	VkDescriptorSet desc_sets[4];
@@ -149,7 +210,7 @@ typedef struct vulkan_material_shader_t {
 	VkDescriptorSetLayout obj_desc_set_layout;
 	VkDescriptorPool obj_desc_pool;
 
-	global_uni_obj_t global_ubo;
+	vulkan_material_shader_global_ubo_t global_ubo;
 	texture_use_t sampler_uses[VULKAN_MATERIAL_SHADER_SAMPLER_COUNT];	
 
 	uint32_t obj_uniform_buffer_idx;
@@ -163,16 +224,15 @@ typedef struct vulkan_geo_data_t {
 	uint32_t id;
 	uint32_t gen;
 	uint32_t vertex_count;
-	uint32_t vertex_size;
+	uint32_t vertex_element_size;
 	uint32_t vertex_buffer_offset;
 	uint32_t idx_count;
-	uint32_t idx_size;
+	uint32_t idx_element_size;
 	uint32_t idx_buffer_offset;
 } vulkan_geo_data_t;
 
 /* =========================== Vulkan Context =============================== */
 typedef struct vulkan_context_t {
-	
 	VkInstance instance;
 	VkSurfaceKHR surface;
 	VkAllocationCallbacks *alloc;
@@ -180,17 +240,25 @@ typedef struct vulkan_context_t {
 	vulkan_device_t device;
 	vulkan_swapchain_t swapchain;
 	vulkan_renderpass_t main_render;
+	vulkan_renderpass_t ui_render;
 
 	vulkan_commandbuffer_t *graphic_comm_buffer;
 	VkSemaphore *avail_semaphore;
 	VkSemaphore *complete_semaphore;
 
-	vulkan_fence_t *in_flight_fence;
-	vulkan_fence_t **image_in_flight;
+	VkFence in_flight_fence[3];
+	VkFence *image_in_flight[4];
+	VkFramebuffer world_framebuffer[4];
 
 	vulkan_buffer_t obj_vert_buffer;
 	vulkan_buffer_t obj_idx_buffer;
 
+	vulkan_material_shader_t material_shader;
+	vulkan_ui_shader_t ui_shader;
+
+	vulkan_geo_data_t geometries[VULKAN_GEOMETRY_MAX_COUNT];
+
+	int32_t (*find_mem_idx)(uint32_t type_filter, uint32_t prop_flag);
 	float frame_delta;
 
 	uint64_t geo_vert_offset;
@@ -207,10 +275,6 @@ typedef struct vulkan_context_t {
 	uint32_t current_frame;
 
 	b8 recreate_swap;
-	vulkan_material_shader_t material_shader;
-	vulkan_geo_data_t geometries[VULKAN_GEOMETRY_MAX_COUNT];
-
-	int32_t (*find_mem_idx)(uint32_t type_filter, uint32_t prop_flag);
 } vulkan_context_t;
 
 typedef struct vulkan_texture_data_t {
