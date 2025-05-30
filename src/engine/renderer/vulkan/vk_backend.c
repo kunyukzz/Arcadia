@@ -323,17 +323,21 @@ b8 vk_backend_init(render_backend_t *backend, const char *name) {
 	/* ======================= Vulkan Renderpass ============================= */
     // World Render Layer
     vk_renderpass_init(&context,
-                       (vec4){.x = 0, 0, context.framebuffer_w,
-                              context.framebuffer_h},
+                       (vec4){.x = 0.0f,
+                              .y = 0.0f,
+                              .z = context.framebuffer_w,
+                              .w = context.framebuffer_h},
                        (vec4){.x = 0.3f, 0.2f, 0.5f, 1.0f}, 1.0f, 0,
                        CLEAR_COLOR_BUFFER | CLEAR_DEPTH_BUFFER |
-                           CLEAR_STENCIL_BUFFER,
+					   CLEAR_STENCIL_BUFFER,
                        false, true, &context.main_render);
 
     // UI Render Layer
     vk_renderpass_init(&context,
-                       (vec4){.x = 0, 0, context.framebuffer_w,
-                              context.framebuffer_h},
+                       (vec4){.x = 0.0f,
+                              .y = 0.0f,
+                              .z = context.framebuffer_w,
+                              .w = context.framebuffer_h},
                        (vec4){.x = 0.0f, 0.0f, 0.0f, 0.0f}, 1.0f, 0,
                        CLEAR_NON_FLAG, true, false, &context.ui_render);
 
@@ -737,7 +741,7 @@ void vk_backend_tex_init(const uint8_t *pixel, texture_t *texture) {
         (vulkan_texture_data_t *)texture->internal_data;
 	VkDeviceSize image_size = texture->width * texture->height * texture->channel_count;
 
-	// NOTE: assume 8-bit per channel.
+	// NOTE: 8-bit per channel.
 	VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
 
 	/* Create staging buffer & load data */

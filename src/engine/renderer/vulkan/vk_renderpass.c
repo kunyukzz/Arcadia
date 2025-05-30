@@ -3,7 +3,6 @@
 #include "engine/core/logger.h"
 #include "engine/memory/memory.h"
 #include "engine/renderer/vulkan/vk_type.h"
-#include <vulkan/vulkan_core.h>
 
 void vk_renderpass_init(vulkan_context_t *ctx, vec4 render_area,
                         vec4 clear_color, float depth, uint32_t stencil,
@@ -111,7 +110,6 @@ void vk_renderpass_init(vulkan_context_t *ctx, vec4 render_area,
 void vk_renderpass_begin(vulkan_commandbuffer_t *combuff,
                          vulkan_renderpass_t    *renderpass,
                          VkFramebuffer           framebuffer) {
-    VkClearValue          clear_values[2];
     VkRenderPassBeginInfo begin_info = {};
     begin_info.sType                 = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     begin_info.renderPass            = renderpass->handle;
@@ -123,59 +121,47 @@ void vk_renderpass_begin(vulkan_commandbuffer_t *combuff,
     begin_info.clearValueCount          = 0;
     begin_info.pClearValues             = 0;
 
+    VkClearValue clear_values[2];
+	memory_zero(clear_values, sizeof(VkClearValue) * 2);
+
     b8 do_clear_color = (renderpass->clear_flags & CLEAR_COLOR_BUFFER) != 0;
     b8 do_clear_depth = (renderpass->clear_flags & CLEAR_DEPTH_BUFFER) != 0;
-	uint32_t clear_index = 0;
     if (do_clear_color) {
-		/*
         memory_copy(clear_values[begin_info.clearValueCount].color.float32,
                     renderpass->clear_color.elements, sizeof(float) * 4);
-		begin_info.clearValueCount++;
-		*/
-        memory_copy(clear_values[clear_index].color.float32,
-                    renderpass->clear_color.elements, sizeof(float) * 4);
-		clear_index++;
+        begin_info.clearValueCount++;
     }
 
     if (do_clear_depth) {
-		/*
         memory_copy(clear_values[begin_info.clearValueCount].color.float32,
                     renderpass->clear_color.elements, sizeof(float) * 4);
         clear_values[begin_info.clearValueCount].depthStencil.depth =
             renderpass->depth;
-
-		clear_values[clear_index].depthStencil.depth = renderpass->depth;
 
         b8 do_clear_stencil =
             (renderpass->clear_flags & CLEAR_STENCIL_BUFFER) != 0;
         clear_values[begin_info.clearValueCount].depthStencil.stencil =
             do_clear_stencil ? renderpass->stencil : 0;
         begin_info.clearValueCount++;
-		*/
-
-		clear_values[clear_index].depthStencil.depth = renderpass->depth;
-		b8 do_clear_stencil = (renderpass->clear_flags & CLEAR_STENCIL_BUFFER) != 0;
-        clear_values[clear_index].depthStencil.stencil =
-            do_clear_stencil ? renderpass->stencil : 0;
-        clear_index++;
     }
 
-    //begin_info.pClearValues = begin_info.clearValueCount > 0 ? clear_values : 0;
-	begin_info.clearValueCount = clear_index;
-	begin_info.pClearValues = clear_index > 0 ? clear_values : 0;
+    begin_info.pClearValues = begin_info.clearValueCount > 0 ? clear_values : 0;
 
     vkCmdBeginRenderPass(combuff->handle, &begin_info,
                          VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void vk_renderpass_end(vulkan_commandbuffer_t *combuff, vulkan_renderpass_t *renderpass) {
-	(void)renderpass;
-	vkCmdEndRenderPass(combuff->handle);
+void vk_renderpass_end(vulkan_commandbuffer_t *combuff,
+                       vulkan_renderpass_t    *renderpass) {
+    (void)renderpass;
+    vkCmdEndRenderPass(combuff->handle);
 }
 
-void vk_renderpass_shut(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass) {
-	if (renderpass && renderpass->handle) {
-		vkDestroyRenderPass(ctx->device.logic_dev, renderpass->handle, ctx->alloc);
-		renderpass->handle = 0;
-	}
+void vk_renderpass_shut(vulkan_context_t    *ctx,
+                        vulkan_renderpass_t *renderpass) {
+    if (renderpass && renderpass->handle) {
+        vkDestroyRenderPass(ctx->device.logic_dev, renderpass->handle,
+                            ctx->alloc);
+        renderpass->handle = 0;
+    }
 }

@@ -311,10 +311,10 @@ b8 application_init(struct game_entry *game_inst) {
     vertex_2d uiverts [4];
 
 	// Top Left
-    uiverts[0].position.x = 0.0f;  // 0    3
-    uiverts[0].position.y = 0.0f;  //
-    uiverts[0].texcoord.x = 0.0f;  //
-    uiverts[0].texcoord.y = 0.0f;  // 2    1
+    uiverts[0].position.x = 0.0f;
+    uiverts[0].position.y = 0.0f;
+    uiverts[0].texcoord.x = 0.0f;
+    uiverts[0].texcoord.y = 0.0f;
 
 	// Bottom Right
     uiverts[1].position.y = f;
