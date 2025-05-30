@@ -204,8 +204,7 @@ typedef struct vulkan_material_shader_t {
 
 	VkDescriptorSetLayout global_desc_set_layout;
 	VkDescriptorPool global_desc_pool;
-	VkDescriptorSet global_desc_sets[4]; // TODO: configure this using dynamic
-										 // array
+	VkDescriptorSet global_desc_sets[4]; // TODO: using dynamic array
 
 	VkDescriptorSetLayout obj_desc_set_layout;
 	VkDescriptorPool obj_desc_pool;
@@ -214,7 +213,7 @@ typedef struct vulkan_material_shader_t {
 	texture_use_t sampler_uses[VULKAN_MATERIAL_SHADER_SAMPLER_COUNT];	
 
 	uint32_t obj_uniform_buffer_idx;
-	b8 desc_updated[4]; // TODO: configure this using dynamic array
+	b8 desc_updated[4]; // TODO: using dynamic array
 } vulkan_material_shader_t;
 
 /* ========================== Vulkan Geometry =============================== */

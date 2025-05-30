@@ -400,6 +400,15 @@ void vk_ui_shader_apply_material(vulkan_context_t   *ctx,
                                 shader->pipeline.pipe_layout, 1, 1,
                                 &obj_desc_set, 0, 0);
     }
+
+	/*
+    if (material->diffuse_map.texture) {
+        ar_TRACE("Diffuse Map - Texture: %s",
+                 material->diffuse_map.texture->name);
+    } else {
+        ar_TRACE("Diffuse Map - Texture: NULL texture");
+    }
+	*/
 }
 
 b8 vk_ui_shader_acquire_resc(vulkan_context_t *ctx, vulkan_ui_shader_t *shader,

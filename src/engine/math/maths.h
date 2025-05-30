@@ -461,16 +461,16 @@ _arinline mat4 mat4_ortho(float left, float right, float bottom, float top,
 	memory_zero(result.data, sizeof(float) * 16);
 
 #ifdef AR_USE_COLUMN_MAJOR
-	float lr = 1.0f / (left - right);
-	float bt = 1.0f / (bottom - top);
-	float nf = 1.0f / (near - far);
+	float lr = 1.0f / (right - left);
+	float bt = 1.0f / (top - bottom);
+	float nf = 1.0f / (far - near);
 
-	result.data[0] = -2.0f * lr;
-	result.data[5] = -2.0f * bt;
-	result.data[10] = 2.0f * nf;
-	result.data[12] = (left + right) * lr;
-	result.data[13] = (top - bottom) * bt;
-	result.data[14] = (far - near) * nf;
+	result.data[0] = 2.0f * lr;
+	result.data[5] = 2.0f * bt;
+	result.data[10] = -2.0f * nf;
+	result.data[12] = -(right + left) * lr;
+	result.data[13] = -(top + bottom) * bt;
+	result.data[14] = -(far + near) * nf;
 	result.data[15] = 1.0f;
 
 #elif defined(AR_USE_ROW_MAJOR)

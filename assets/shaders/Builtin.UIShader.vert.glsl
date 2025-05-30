@@ -22,7 +22,7 @@ layout(location = 1) out struct dto {
 } out_dto;
 
 void main() {
-	out_dto.tex_coord = vec2(in_texcoord.x, in_texcoord.y);
+	out_dto.tex_coord = vec2(in_texcoord.x, 1 - in_texcoord.y);
 	gl_Position = global_ubo.projection * global_ubo.view * u_push_consts.model
 		* vec4(in_pos, 0.0, 1.0);
 }

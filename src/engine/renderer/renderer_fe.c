@@ -16,6 +16,16 @@ typedef struct render_state_t {
 
 static render_state_t *p_state;
 
+void mat4_print(mat4 m) {
+    for (int i = 0; i < 4; ++i) {
+        ar_TRACE("[%.2f %.2f %.2f %.2f]",
+               m.data[i * 4 + 0],
+               m.data[i * 4 + 1],
+               m.data[i * 4 + 2],
+               m.data[i * 4 + 3]);
+    }
+}
+
 b8 renderer_init(uint64_t *memory_require, void *state, const char *name) {
 	*memory_require = sizeof(render_state_t);
 	if (state == 0)
@@ -36,12 +46,27 @@ b8 renderer_init(uint64_t *memory_require, void *state, const char *name) {
                                            p_state->near, p_state->far);
     p_state->view       = mat4_translate((vec3){.x = 0.0f, 0.0f, -30.0f, 0.0f});
     p_state->view       = mat4_inverse(p_state->view);
-
+ 
 	/* UI Projection */
-	p_state->ui_projection = mat4_ortho(0, 1280.0f, 720.0f, 0.0f, -100.0f, 100.0f);
+	p_state->ui_projection = mat4_ortho(0.0f, 1280.0f, 0.0f, 720.0f, -100.0f, 100.0f);
 	p_state->ui_view = mat4_identity();
+	/*
+	mat4 m = mat4_ortho(0, 1280, 0, 720, -100, 100);
+    for (int row = 0; row < 4; ++row) {
+        ar_DEBUG("[ ");
+        for (int col = 0; col < 4; ++col) {
+            ar_DEBUG("%.2f ", m.data[col * 4 + row]);
+        }
+        ar_DEBUG("]\n");
+    }
+	*/
 
-	return true;
+    ar_TRACE("UI Projection: ");
+    mat4_print(p_state->ui_projection);
+
+    ar_TRACE("UI View: ");
+    mat4_print(p_state->ui_view);
+    return true;
 }
 
 void renderer_shut(void *state) {
@@ -56,12 +81,12 @@ void renderer_shut(void *state) {
 
 void renderer_resize(uint32_t width, uint32_t height) {
 	if (p_state) {
-		p_state->backend.resize(&p_state->backend, width, height);
         p_state->projection =
             mat4_perspective(deg_to_rad(45.0f), width / (float)height,
                              p_state->near, p_state->far);
         p_state->ui_projection =
-            mat4_ortho(0, (float)width, (float)height, 0.0f, -100.0f, 100.0f);
+            mat4_ortho(0, (float)width, 0.0f, (float)height, -100.0f, 100.0f);
+		p_state->backend.resize(&p_state->backend, width, height);
     } else {
         ar_WARNING("renderer backend does not exist to perform resize: %i %i",
                    width, height);
