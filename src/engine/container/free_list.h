@@ -19,4 +19,5 @@ _arapi b8 freelist_block_free(freelist_t *freelist, uint64_t size,
 
 _arapi void     freelist_clear(freelist_t *freelist);
 _arapi uint64_t freelist_space_free(freelist_t *freelist);
+
 #endif //__FREE_LIST_H__

@@ -229,8 +229,9 @@ b8 is_window_minimized(xcb_connection_t *conn, xcb_window_t window) {
 void platform_shut(void *state) {
 	(void)state;
 	if (p_state) {
-		xcb_disconnect(p_state->conn);
 		xcb_destroy_window(p_state->conn, p_state->window);
+		xcb_flush(p_state->conn);
+		XCloseDisplay(p_state->display);
 	}
 
 	p_state = 0;
@@ -324,6 +325,28 @@ b8 platform_push(void) {
 	}
 
 	return true;
+}
+
+void *platform_allocate(uint64_t size, b8 aligned) {
+	(void)aligned;
+	return malloc(size);
+}
+
+void platform_free(void *block, b8 aligned) {
+	(void)aligned;
+	free(block);
+}
+
+void* platform_zero_mem(void* block, uint64_t size) {
+	return memset(block, 0, size);
+}
+
+void* platform_copy_mem(void* dest, const void* source, uint64_t size) {
+	return memcpy(dest, source, size);
+}
+
+void* platform_set_mem(void* dest, int32_t value, uint64_t size) {
+	return memset(dest, value, size);
 }
 
 b8 platform_create_vulkan_surface(struct vulkan_context_t *context) {

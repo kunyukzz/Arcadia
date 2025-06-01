@@ -40,7 +40,6 @@ typedef struct application_state_t {
 	arena_allocator_t arena;
 
 	subsys_state_t event;
-	subsys_state_t memory;
 	subsys_state_t log;
 	subsys_state_t input;
 	subsys_state_t platform;
@@ -180,6 +179,18 @@ b8 application_init(struct game_entry *game_inst) {
 		return false;
 	}
 
+	/* Memory System */
+	memory_sys_config_t mem_system_config = {};
+	mem_system_config.total_alloc_size = GIBIBYTES(1);
+	if (!memory_init(mem_system_config)) {
+		ar_ERROR("Failed to Initialized memory system. Shutdown.");
+		return false;
+	}
+	
+	/* Allocate Game State */
+	game_inst->state = memory_alloc(game_inst->state_memory_require, MEMTAG_GAME);
+
+	/* Set Engine State */
 	game_inst->app_state = memory_alloc(sizeof(*p_state), MEMTAG_APPLICATION);
 	p_state = game_inst->app_state;
 	p_state->game_inst = game_inst;
@@ -194,11 +205,6 @@ b8 application_init(struct game_entry *game_inst) {
 	event_init(&p_state->event.size, 0);
 	p_state->event.state = arena_allocate(&p_state->arena, p_state->event.size);
 	event_init(&p_state->event.size, p_state->event.state);
-
-	/* set memory allocation */
-	memory_init(&p_state->memory.size, 0);
-	p_state->memory.state = arena_allocate(&p_state->arena, p_state->memory.size);
-	memory_init(&p_state->memory.size, p_state->memory.state);
 
 	/* set log memory allocation */
 	log_init(&p_state->log.size, 0);
@@ -308,7 +314,7 @@ b8 application_init(struct game_entry *game_inst) {
 	string_ncopy(ui_config.name, "test_ui_geometry", GEOMETRY_NAME_MAX_LENGTH);
 
 	const float f = 512.0f;
-    vertex_2d uiverts [4];
+    vertex_2d uiverts[4];
 
 	// Top Left
     uiverts[0].position.x = 0.0f;
@@ -455,11 +461,8 @@ b8 application_run(void) {
 	resource_sys_shut(p_state->resources.state);
 	platform_shut(p_state->platform.state);
 	log_shut(p_state->log.state);
-	memory_shut(p_state->memory.state);
 	event_shut(p_state->event.state);
-
-	if (p_state->game_inst->shut)
-		p_state->game_inst->shut(p_state->game_inst);
+	memory_shut();
 
 	return true;
 }
