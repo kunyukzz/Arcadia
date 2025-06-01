@@ -61,11 +61,14 @@ b8 renderer_init(uint64_t *memory_require, void *state, const char *name) {
     }
 	*/
 
+	/*
     ar_TRACE("UI Projection: ");
     mat4_print(p_state->ui_projection);
 
     ar_TRACE("UI View: ");
     mat4_print(p_state->ui_view);
+	*/
+
     return true;
 }
 

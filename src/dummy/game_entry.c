@@ -1,7 +1,6 @@
 #include "dummy/game.h"
 
 #include "engine/engine_entry.h"
-#include "engine/memory/memory.h"
 
 /* this function was expected by the engine.
  * so the engine knows what game want to do*/
@@ -17,7 +16,8 @@ b8 game_entry_point(game_entry *game) {
 	game->resize = game_resize;
 	game->shut = game_shut;
 
-	game->state = memory_alloc(sizeof(game_state_t), MEMTAG_GAME);
+	game->state_memory_require = sizeof(game_state_t);
+	game->state = 0;
 	game->app_state = 0;
 
 	return true;

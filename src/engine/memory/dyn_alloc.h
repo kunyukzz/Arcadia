@@ -12,7 +12,7 @@ _arapi b8 dyn_alloc_init(uint64_t total_size, uint64_t *mem_require,
 
 _arapi b8 dyn_alloc_shut(dyn_alloc_t *dyn_alloc);
 _arapi void *dyn_alloc_allocate(dyn_alloc_t *dyn_alloc, uint64_t size);
-_arapi void dyn_alloc_free(dyn_alloc_t *dyn_alloc, void *block, uint64_t size);
+_arapi b8 dyn_alloc_free(dyn_alloc_t *dyn_alloc, void *block, uint64_t size);
 _arapi uint64_t dyn_alloc_free_space(dyn_alloc_t *dyn_alloc);
 
 #endif //__DYNAMIC_ALLOCATOR_H__

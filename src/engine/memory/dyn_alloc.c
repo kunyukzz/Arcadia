@@ -82,12 +82,12 @@ void *dyn_alloc_allocate(dyn_alloc_t *dyn_alloc, uint64_t size) {
 	return 0;
 }
 
-void dyn_alloc_free(dyn_alloc_t *dyn_alloc, void *block, uint64_t size) {
+b8 dyn_alloc_free(dyn_alloc_t *dyn_alloc, void *block, uint64_t size) {
     if (!dyn_alloc || !block) {
         ar_ERROR("dyn_alloc_free - require both a valid allocator (0x%p) and "
                  "block (0x%p) to be freed",
                  dyn_alloc, block);
-        return;
+        return false;
     }
 
     dyn_alloc_state_t *state = dyn_alloc->memory;
@@ -97,14 +97,16 @@ void dyn_alloc_free(dyn_alloc_t *dyn_alloc, void *block, uint64_t size) {
         ar_ERROR("dyn_alloc_free - try to release block (0x%p) outside of "
                  "allocator range (0x%p)-(0x%p)",
                  block, state->mem_block, end_block);
-        return;
+        return false;
     }
 
 	uint64_t offset = (uint64_t)((char *)block - (char *)state->mem_block);
 	if (!freelist_block_free(&state->freelist, size, offset)) {
 		ar_ERROR("dyn_alloc_free - Failed");
-		return;
+		return false;
 	}
+
+	return true;
 }
 
 uint64_t dyn_alloc_free_space(dyn_alloc_t *dyn_alloc) {

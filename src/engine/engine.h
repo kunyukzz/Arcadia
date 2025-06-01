@@ -1,6 +1,5 @@
 #ifndef __ENGINE_H__
 #define __ENGINE_H__
-#include <stdint.h>
 
 #include "engine/core/application.h"
 
@@ -15,6 +14,8 @@ typedef struct game_entry {
 	b8 (*render)(struct game_entry *game_inst, float delta_time);
 	void (*resize)(struct game_entry *game_inst, uint32_t width, uint32_t height);
 	void (*shut)(struct game_entry *game_inst);
+
+	uint64_t state_memory_require;
 
 	void *state;
 	void *app_state;

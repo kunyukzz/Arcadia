@@ -13,6 +13,13 @@
 #define false 0
 #define INVALID_ID 4294967295u
 
+#define GIBIBYTES(amount) ((amount) * 1024 * 1024 * 1024)
+#define MEBIBYTES(amount) ((amount) * 1024 * 1024)
+#define KIBIBYTES(amount) ((amount) * 1024)
+#define GIGABYTES(amount) ((amount) * 1000 * 1000 * 1000)
+#define MEGABYTES(amount) ((amount) * 1000 * 1000)
+#define KILOBYTES(amount) ((amount) * 1000)
+
 typedef _Bool b8;
 
 #define ar_CLAMP(value, min, max)                                              \

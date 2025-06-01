@@ -1,8 +1,9 @@
 #include "engine/memory/memory.h"
+
 #include "engine/core/logger.h"
 #include "engine/core/ar_strings.h"
-
-#include <stdlib.h>
+#include "engine/memory/dyn_alloc.h"
+#include "engine/platform/platform.h"
 
 static const char *memtag_string[MEMTAG_MAX_TAGS] = {
     "MEMTAG_UNKNOWN",
@@ -30,60 +31,95 @@ struct mem_status {
 
 typedef struct memory_state_t {
 	struct mem_status status;
+	memory_sys_config_t config;
 	uint64_t alloc_count;
+	uint64_t alloc_mem_require;
+	dyn_alloc_t allocator;
+	void *allocator_block;
 } memory_state_t;
 
 static memory_state_t *p_state;
 
-void memory_init(uint64_t *required, void *state) {
-	*required = sizeof(memory_state_t);
-	if (state == 0)
-		return;
+b8 memory_init(memory_sys_config_t config) {
+	uint64_t state_memory_require = sizeof(memory_state_t);
+	uint64_t alloc_req = 0;
+	dyn_alloc_init(config.total_alloc_size, &alloc_req, 0, 0);
 
-	p_state = state;
+	void *block = platform_allocate(state_memory_require + alloc_req, false);
+	if (!block) {
+		ar_FATAL("Memory allocation failed.");
+		return false;
+	}
+
+	p_state = (memory_state_t *)block;
+	p_state->config = config;
 	p_state->alloc_count = 0;
+	p_state->alloc_mem_require = alloc_req;
 	memory_zero(&p_state->status, sizeof(p_state->status));
 
-	ar_INFO("Memory System Initialized");
+	p_state->allocator_block = ((void *)((char *)block + state_memory_require));
+
+    if (!dyn_alloc_init(config.total_alloc_size,
+						&p_state->alloc_mem_require,
+                        p_state->allocator_block, &p_state->allocator)) {
+        ar_FATAL("Memory unable to setup internal allocator.");
+        return false;
+    }
+
+    ar_INFO("Memory System Initialized. Allocated %llu bytes",
+                                config.total_alloc_size);
+    return true;
 }
 
-void memory_shut(void *state) {
-	(void)state;
-	p_state = 0;
+void memory_shut() {
+    if (p_state) {
+        dyn_alloc_shut(&p_state->allocator);
+        platform_free(p_state,
+                      p_state->alloc_mem_require + sizeof(memory_state_t));
+    }
+    p_state = 0;
 }
 
 void *memory_alloc_debug(uint64_t size, mem_tag_t tag, const char *file,
                          int line, const char *func) {
-  if (tag == MEMTAG_UNKNOWN)
-    ar_WARNING("Memory allocation with MEMTAG_UNKNOWN at %s:%d (%s)", file,
-               line, func);
+    if (tag == MEMTAG_UNKNOWN)
+        ar_WARNING("Memory allocation with MEMTAG_UNKNOWN at %s:%d (%s)", file,
+                   line, func);
 
-  if (p_state) {
-    p_state->status.total_allocated += size;
-    p_state->status.tagged_allocation[tag] += size;
-    p_state->status.tagged_alloc_count[tag]++;
-    p_state->alloc_count++;
-  }
+    void *block = 0;
+    if (p_state) {
+        p_state->status.total_allocated += size;
+        p_state->status.tagged_allocation[tag] += size;
+        p_state->status.tagged_alloc_count[tag]++;
+        p_state->alloc_count++;
+        block = dyn_alloc_allocate(&p_state->allocator, size);
+    } else {
+        block = platform_allocate(size, false);
+    }
 
-  void *block = malloc(size);
-
-  /*
-  void *block = 0;
-  posix_memalign(&block, 16, size);
-  */
-  memory_set(block, 0, size);
-
-  return block;
+    if (block) {
+        memory_set(block, 0, size);
+        return block;
+    }
+    return 0;
 }
 
 void memory_free(void *block, uint64_t size, mem_tag_t tag) {
-	if (p_state) {
-		p_state->status.total_allocated -= size;
-		p_state->status.tagged_allocation[tag] -= size;
-		p_state->status.tagged_alloc_count[tag]--;
+	if (!block) {
+		return;
 	}
 
-	free(block);
+    if (p_state) {
+        p_state->status.total_allocated -= size;
+        p_state->status.tagged_allocation[tag] -= size;
+        p_state->status.tagged_alloc_count[tag]--;
+
+        b8 result = dyn_alloc_free(&p_state->allocator, block, size);
+        if (!result)
+            platform_free(block, false);
+    } else {
+        platform_free(block, false);
+    }
 }
 
 void *memory_zero(void *block, uint64_t size) {
