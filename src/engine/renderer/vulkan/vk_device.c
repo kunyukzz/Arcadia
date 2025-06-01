@@ -45,12 +45,21 @@ b8 query_queue_families(VkPhysicalDevice device, VkSurfaceKHR surface,
 	for (uint32_t i = 0; i < count; ++i) {
 		uint8_t score = 0;
 
-		if (props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-			out_info->graphic_family_idx = i;
-			++score;
-		}
+        if (out_info->graphic_family_idx == (uint32_t)-1 &&
+            props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+            out_info->graphic_family_idx = i;
+            ++score;
 
-		if (props[i].queueFlags & VK_QUEUE_COMPUTE_BIT) {
+            VkBool32 support = VK_FALSE;
+            VK_CHECK(vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface,
+                                                          &support));
+            if (support) {
+                out_info->present_family_idx = i;
+                ++score;
+            }
+        }
+
+        if (props[i].queueFlags & VK_QUEUE_COMPUTE_BIT) {
 			out_info->compute_family_idx = i;
 			++score;
 		}
