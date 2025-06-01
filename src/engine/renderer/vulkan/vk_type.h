@@ -246,7 +246,7 @@ typedef struct vulkan_context_t {
 	VkSemaphore *complete_semaphore;
 
 	VkFence in_flight_fence[3];
-	VkFence *image_in_flight[4];
+	VkFence image_in_flight[4];
 	VkFramebuffer world_framebuffer[4];
 
 	vulkan_buffer_t obj_vert_buffer;

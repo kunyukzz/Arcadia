@@ -83,7 +83,7 @@ void *dyn_alloc_allocate(dyn_alloc_t *dyn_alloc, uint64_t size) {
 }
 
 b8 dyn_alloc_free(dyn_alloc_t *dyn_alloc, void *block, uint64_t size) {
-    if (!dyn_alloc || !block) {
+    if (!dyn_alloc || !block || !size) {
         ar_ERROR("dyn_alloc_free - require both a valid allocator (0x%p) and "
                  "block (0x%p) to be freed",
                  dyn_alloc, block);

@@ -41,7 +41,7 @@ void return_node(freelist_t *freelist, freelist_node_t *node) {
 /* ========================================================================== */
 void freelist_init(uint64_t total_size, uint64_t *mem_require,
                           void *memory, freelist_t *freelist) {
-	uint64_t max_entry = (total_size / sizeof(void *));
+	uint64_t max_entry = (total_size / sizeof(freelist_node_t));
 	*mem_require = sizeof(internal_state_t) + (sizeof(freelist_node_t) * max_entry);
 	if (!memory) 
 		return;

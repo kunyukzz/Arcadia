@@ -574,6 +574,8 @@ b8 vk_backend_begin_frame(render_backend_t *backend, float delta_time) {
 
 	context.main_render.render_area.z = context.framebuffer_w;
 	context.main_render.render_area.w = context.framebuffer_h;
+	context.ui_render.render_area.z = context.framebuffer_w;
+	context.ui_render.render_area.w = context.framebuffer_h;
 
     return true;
 }
@@ -616,7 +618,7 @@ b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
     if (context.image_in_flight[context.image_idx] != 0) {
         VkResult result =
             vkWaitForFences(context.device.logic_dev, 1,
-                            context.image_in_flight[context.image_idx], true,
+                            &context.image_in_flight[context.image_idx], true,
                             UINT64_MAX);
         if (!vk_result_is_success(result)) {
             ar_FATAL("vkWaitForFences error: %s",
@@ -625,7 +627,7 @@ b8 vk_backend_end_frame(render_backend_t *backend, float delta_time) {
     }
 
     context.image_in_flight[context.image_idx] =
-        &context.in_flight_fence[context.current_frame];
+        context.in_flight_fence[context.current_frame];
     VK_CHECK(vkResetFences(context.device.logic_dev, 1,
                            &context.in_flight_fence[context.current_frame]));
 
