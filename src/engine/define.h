@@ -12,6 +12,8 @@
 #define true 1
 #define false 0
 #define INVALID_ID 4294967295u
+#define INVALID_ID_U16 65535u
+#define INVALID_ID_U8 255U
 
 #define GIBIBYTES(amount) ((amount) * 1024 * 1024 * 1024)
 #define MEBIBYTES(amount) ((amount) * 1024 * 1024)
@@ -21,6 +23,10 @@
 #define KILOBYTES(amount) ((amount) * 1000)
 
 typedef _Bool b8;
+typedef struct range {
+	uint64_t offset;
+	uint64_t size;
+} range;
 
 #define ar_CLAMP(value, min, max)                                              \
   (value <= min) ? min : (value >= max) ? max : value
@@ -47,5 +53,13 @@ typedef _Bool b8;
 #else
 	#define _aralignas __attribute__((aligned(16)))
 #endif
+
+_arinline uint64_t get_aligned(uint64_t operand, uint64_t granular) {
+	return ((operand + (granular - 1)) & ~(granular - 1));
+}
+
+_arinline range get_aligned_range(uint64_t offset, uint64_t size, uint64_t granular) {
+	return (range){get_aligned(offset, granular), get_aligned(size, granular)};
+}
 
 #endif //__DEFINE_H__

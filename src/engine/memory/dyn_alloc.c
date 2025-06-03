@@ -73,7 +73,7 @@ void *dyn_alloc_allocate(dyn_alloc_t *dyn_alloc, uint64_t size) {
             uint64_t avail = freelist_space_free(&state->freelist);
             ar_ERROR("Requested Size: %llu, available: %llu", size, avail);
 
-			// TODO: Report Fragmentation
+			// TODO: Report Fragmentation Memory Layout
 			return 0;
 		}
 	}

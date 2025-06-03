@@ -2,6 +2,7 @@
 #define __AR_STRINGS_H__
 
 #include "engine/define.h"
+#include "engine/container/dyn_array.h"
 #include "engine/math/math_type.h"
 #include "engine/memory/memory.h"
 
@@ -18,7 +19,6 @@ _arinline char *string_empty(char *str) {
 	if (str) {
 		str[0] = 0;
 	}
-
 	return str;
 }
 
@@ -29,7 +29,8 @@ _arinline uint64_t string_length(const char *str) {
 _arinline char *string_duplicate(const char *str) {
 	uint64_t length = string_length(str);
 	char *copy = memory_alloc(length + 1, MEMTAG_STRING);
-	memory_copy(copy, str, length + 1);
+	memory_copy(copy, str, length);
+	copy[length] = 0;
 	return copy;
 }
 
@@ -53,7 +54,6 @@ _arinline int32_t string_format_v(char *dest, const char *format, va_list va_lis
 		memory_copy(dest, buffer, (uint16_t)written + 1);
 		return written;
 	}
-
 	return -1;
 }
 
@@ -65,7 +65,6 @@ _arinline int32_t string_format(char *dest, const char *format, ...) {
 		va_end(arg_ptr);
 		return written;
 	}
-
 	return -1;
 }
 
@@ -94,7 +93,6 @@ _arinline char *string_trim(char *str) {
 		// Null-terminate after last non-whitespace char
 		end[1] = '\0';
     }
-
     return str;
 }
 
@@ -183,21 +181,199 @@ _arinline b8 string_to_vec4(char *str, vec4 *v) {
     return result == 4;
 }
 
-/*
-static inline const char *string_find(const char *haystack, const char *needle) {
-	while (*haystack) {
-		const char *h = haystack;
-		const char *n = needle;
-		while (*h && *n && (*h == *n)) {
-			++h;
-			++n;
-		}
-		if (!*n) return haystack;
-		++haystack;
-	}
-	return 0;
-}
-*/
+_arinline b8 string_to_float(char *str, float *f) {
+	if (!str || !f)
+		return false;
 
+	*f = 0;
+	int32_t result = sscanf(str, "%f", f);
+	return result == 1;
+}
+
+_arinline b8 string_to_double(char *str, double *f) {
+	if (!str || !f)
+		return false;
+
+	*f = 0;
+	int32_t result = sscanf(str, "%lf", f);
+	return result == 1;
+}
+
+_arinline b8 string_to_i8(char *str, int8_t *i) {
+	if (!str || !i)
+		return false;
+
+	*i = 0;
+	int32_t result = sscanf(str, "%hhi", i);
+	return result == 1;
+}
+
+_arinline b8 string_to_i16(char *str, int16_t *i) {
+	if (!str || !i)
+		return false;
+
+	*i = 0;
+	int32_t result = sscanf(str, "%hi", i);
+	return result == 1;
+}
+
+_arinline b8 string_to_i32(char *str, int32_t *i) {
+	if (!str || !i)
+		return false;
+
+	*i = 0;
+	int32_t result = sscanf(str, "%i", i);
+	return result == 1;
+}
+
+_arinline b8 string_to_i64(char *str, int64_t *i) {
+	if (!str || !i)
+		return false;
+
+	*i = 0;
+	int32_t result = sscanf(str, "%li", i);
+	return result == 1;
+}
+
+_arinline b8 string_to_u8(char *str, uint8_t *u) {
+	if (!str || !u)
+		return false;
+
+	*u = 0;
+	int32_t result = sscanf(str, "%hhu", u);
+	return result == 1;
+}
+
+_arinline b8 string_to_u16(char *str, uint16_t *u) {
+	if (!str || !u)
+		return false;
+
+	*u = 0;
+	int32_t result = sscanf(str, "%hu", u);
+	return result == 1;
+}
+
+_arinline b8 string_to_u32(char *str, uint32_t *u) {
+	if (!str || !u)
+		return false;
+
+	*u = 0;
+	int32_t result = sscanf(str, "%u", u);
+	return result == 1;
+}
+
+_arinline b8 string_to_u64(char *str, uint64_t *u) {
+	if (!str || !u)
+		return false;
+
+	*u = 0;
+	int32_t result = sscanf(str, "%lu", u);
+	return result == 1;
+}
+
+_arinline b8 string_to_bool(char *str, b8 *b) {
+	if (!str || !b)
+		return false;
+
+	*b = string_equal(str, "1") || string_equali(str, "true");
+	return *b;
+}
+
+_arinline uint32_t string_split(const char *str, char delimit,
+                                char ***str_array, b8 trim_entry,
+                                b8 inc_empty) {
+    if (!str || !str_array) {
+        return 0;
+    }
+
+    char    *result      = 0;
+    uint32_t trim_length = 0;
+    uint32_t entry_count = 0;
+    uint32_t length      = string_length(str);
+    char buffer[16384]; // if a single enty goes beyond, please just don't do
+                        // that
+    uint32_t curr_length = 0;
+
+    for (uint32_t i = 0; i < length; ++i) {
+        char c = str[i];
+
+        /* found delimit. finalize string */
+        if (c == delimit) {
+            buffer[curr_length] = 0;
+            result              = buffer;
+            trim_length         = curr_length;
+
+            // Trim if doable
+            if (trim_entry && curr_length > 0) {
+                result      = string_trim(result);
+                trim_length = string_length(result);
+            }
+
+            // Add new entry
+            if (trim_length > 0 || inc_empty) {
+                char *ee = memory_alloc(sizeof(char) * (trim_length + 1),
+                                        MEMTAG_STRING);
+                if (trim_length == 0) {
+                    ee[0] = 0;
+                } else {
+                    string_ncopy(ee, result, trim_length);
+                    ee[trim_length] = 0;
+                }
+
+                char **a = *str_array;
+                dyn_array_push(a, ee);
+                *str_array = a;
+                entry_count++;
+            }
+
+            // Clear buffer
+            memory_zero(buffer, sizeof(char) * 16384);
+            curr_length = 0;
+            continue;
+        }
+        buffer[curr_length] = c;
+        curr_length++;
+    }
+
+    /* If any char queued up, read them */
+    result      = buffer;
+    trim_length = curr_length;
+
+    if (trim_entry && curr_length > 0) {
+        result      = string_trim(result);
+        trim_length = string_length(result);
+    }
+
+    if (trim_length > 0 || inc_empty) {
+        char *ee =
+            memory_alloc(sizeof(char) * (trim_length + 1), MEMTAG_STRING);
+        if (trim_length == 0) {
+            ee[0] = 0;
+        } else {
+            string_ncopy(ee, result, trim_length);
+            ee[trim_length] = 0;
+        }
+
+        char **a = *str_array;
+        dyn_array_push(a, ee);
+        *str_array = a;
+        entry_count++;
+    }
+
+    return entry_count;
+}
+
+_arinline void string_clean_split_array(char **str_array) {
+    if (str_array) {
+        uint32_t count = dyn_array_length(str_array);
+
+        for (uint32_t i = 0; i < count; ++i) {
+            uint32_t len = string_length(str_array[i]);
+            memory_free(str_array[i], sizeof(char) * (len + 1), MEMTAG_STRING);
+        }
+
+        dyn_array_clear(str_array);
+    }
+}
 
 #endif //__AR_STRINGS_H__

@@ -17,6 +17,7 @@ static const char *memtag_string[MEMTAG_MAX_TAGS] = {
     "MEMTAG_GAME",
 	"MEMTAG_TEXTURE",
 	"MEMTAG_MATERIAL",
+	"MEMTAG_RESOURCE",
     "MEMTAG_TRANSFORM",
     "MEMTAG_ENTITY",
     "MEMTAG_ENTITY_NODE",
