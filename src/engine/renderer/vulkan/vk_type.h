@@ -1,12 +1,17 @@
 #ifndef __VULKAN_TYPE_H__
 #define __VULKAN_TYPE_H__
 
+#include "engine/container/free_list.h"
+#include "engine/container/hashtable.h"
 #include "engine/core/assertion.h"
 #include "engine/renderer/renderer_type.h"
+
 
 #include <vulkan/vulkan.h>
 
 #define VK_CHECK(expr) {ar_assert(expr == VK_SUCCESS);}
+
+struct vulkan_context_t;
 
 /* ============================= Vulkan Image =============================== */
 typedef struct vulkan_image_t {
@@ -104,117 +109,83 @@ typedef struct vulkan_buffer_t {
 	VkDeviceMemory memory;
 	int32_t mem_idx;
 	uint32_t mem_prop_flag;
+	uint64_t freelist_mem_req;
+	freelist_t buffer_freelist;
+	b8 has_freelist;
+	void *freelist_block;
 } vulkan_buffer_t;
 
-/* ========================== Vulkan UI Shaders ============================= */
-typedef struct vulkan_desc_state_t {
-	uint32_t gen[4];
-	uint32_t id[4];
-} vulkan_desc_state_t;
-
+/* =========================== Vulkan Shaders =============================== */
 typedef struct vulkan_shader_stage_t {
 	VkShaderModuleCreateInfo cr_info;
 	VkShaderModule handle;
 	VkPipelineShaderStageCreateInfo shader_stg_cr_info;
 } vulkan_shader_stage_t;
 
-/* This for UI shaders */
-#define UI_SHADER_STAGE_COUNT 2
-#define VULKAN_UI_SHADER_DESC_COUNT 2
-#define VULKAN_UI_SHADER_SAMPLER_COUNT 1
+/* This for world & object shaders */
+#define VULKAN_MATERIAL_MAX_COUNT 1024
 #define VULKAN_UI_MAX_COUNT 1024
 
-typedef struct vulkan_ui_shader_state_t {
+#define VULKAN_SHADER_MAX_STAGES 8
+#define VULKAN_SHADER_MAX_GLOBAL_TEXTURES 31
+#define VULKAN_SHADER_MAX_INSTANCE_TEXTURES 31
+#define VULKAN_SHADER_MAX_ATTRIBUTES 16
+#define VULKAN_SHADER_MAX_UNIFORMS 128
+#define VULKAN_SHADER_MAX_BINDING 32
+#define VULKAN_SHADER_MAX_PUSH_CONST_RANGE 32
+
+typedef struct vulkan_shader_stage_config_t {
+	VkShaderStageFlagBits stage;
+	char filename[255];
+} vulkan_shader_stage_config_t;
+
+typedef struct vulkan_descriptor_set_config_t {
+	uint8_t bind_count;
+	VkDescriptorSetLayoutBinding bindings[VULKAN_SHADER_MAX_BINDING];
+} vulkan_descriptor_set_config_t;
+
+typedef struct vulkan_shader_config_t {
+	uint8_t stage_count;
+	vulkan_shader_stage_config_t stages[VULKAN_SHADER_MAX_STAGES];
+	VkDescriptorPoolSize pool_size[2];
+	uint16_t max_desc_set_count;
+	uint8_t desc_set_count;
+	vulkan_descriptor_set_config_t desc_set[2];
+	VkVertexInputAttributeDescription attr[VULKAN_SHADER_MAX_ATTRIBUTES];
+} vulkan_shader_config_t;
+
+typedef struct vulkan_descriptor_state_t {
+	uint8_t gen[4];
+	uint32_t ids[4];
+} vulkan_descriptor_state_t;
+
+typedef struct vulkan_shader_desc_set_state_t {
 	VkDescriptorSet desc_sets[4];
-	vulkan_desc_state_t desc_states[VULKAN_UI_SHADER_DESC_COUNT];
-} vulkan_ui_shader_state_t;
+	vulkan_descriptor_state_t desc_states[VULKAN_SHADER_MAX_BINDING];
+} vulkan_shader_desc_set_state_t;
 
-typedef struct vulkan_ui_shader_global_ubo_t {
-    mat4 projection;   // 64 bytes
-    mat4 view;         // 64 bytes
-    mat4 m_reserved0;  // 64 bytes, reserved for future use
-    mat4 m_reserved1;  // 64 bytes, reserved for future use
-} vulkan_ui_shader_global_ubo_t;
+typedef struct vulkan_shader_instance_state_t {
+	uint32_t id;
+	uint64_t offset;
+	vulkan_shader_desc_set_state_t desc_set_state;
+	struct texture_t **instance_textures;
+} vulkan_shader_instance_state_t;
 
-typedef struct vulkan_ui_shader_instance_ubo_t {
-    vec4 diffuse_color;  // 16 bytes
-    vec4 v_reserved0;    // 16 bytes, reserved for future use
-    vec4 v_reserved1;    // 16 bytes, reserved for future use
-    vec4 v_reserved2;    // 16 bytes, reserved for future use
-} vulkan_ui_shader_instance_ubo_t;
-
-typedef struct vulkan_ui_shader_t {
-	vulkan_shader_stage_t stages[UI_SHADER_STAGE_COUNT];
-
-	/* Global */
-	VkDescriptorPool global_desc_pool;
-	VkDescriptorSetLayout global_desc_set_layout;
+typedef struct vulkan_shader_t {
+	uint32_t id;
+	vulkan_shader_config_t config;
+	vulkan_renderpass_t *renderpass;
+	vulkan_shader_stage_t stages[VULKAN_SHADER_MAX_STAGES];
+	VkDescriptorPool desc_pool;
+	VkDescriptorSetLayout desc_set_layouts[2];
 	VkDescriptorSet global_desc_sets[4];
-	vulkan_buffer_t global_uni_buffer;
-
-	/* Object */
-	VkDescriptorPool obj_desc_pool;
-	VkDescriptorSetLayout obj_desc_set_layout;
-	vulkan_buffer_t obj_uni_buffer;
-
-	vulkan_ui_shader_global_ubo_t global_ubo;
-
-	uint32_t obj_uniform_buffer_idx;
-
-	texture_use_t sampler_uses[VULKAN_UI_SHADER_SAMPLER_COUNT];
-
-	vulkan_ui_shader_state_t instance_states[VULKAN_UI_MAX_COUNT];
 	vulkan_pipeline_t pipeline;
-
-	b8 desc_updated[4];
-} vulkan_ui_shader_t;
-
-/* =========================== Vulkan Shaders =============================== */
-/* This for world & object shaders */
-#define MATERIAL_SHADER_STAGE_COUNT 2
-#define VULKAN_MATERIAL_SHADER_DESC_COUNT 2
-#define VULKAN_MATERIAL_SHADER_SAMPLER_COUNT 1
-#define VULKAN_MATERIAL_MAX_COUNT 1024
-
-typedef struct vulkan_material_shader_global_ubo_t {
-    mat4 projection;   // 64 bytes
-    mat4 view;         // 64 bytes
-    mat4 m_reserved0;  // 64 bytes, reserved for future use
-    mat4 m_reserved1;  // 64 bytes, reserved for future use
-} vulkan_material_shader_global_ubo_t;
-
-typedef struct vulkan_material_shader_instance_ubo_t {
-    vec4 diffuse_color;  // 16 bytes
-    vec4 v_reserved0;    // 16 bytes, reserved for future use
-    vec4 v_reserved1;    // 16 bytes, reserved for future use
-    vec4 v_reserved2;    // 16 bytes, reserved for future use
-} vulkan_material_shader_instance_ubo_t;
-
-typedef struct vulkan_material_shader_state_t {
-	VkDescriptorSet desc_sets[4];
-	vulkan_desc_state_t desc_states[VULKAN_MATERIAL_SHADER_DESC_COUNT];
-} vulkan_material_shader_state_t;
-
-typedef struct vulkan_material_shader_t {
-	vulkan_shader_stage_t stages[MATERIAL_SHADER_STAGE_COUNT];
-	vulkan_pipeline_t pipeline;
-	vulkan_buffer_t global_uni_buffer;
-	vulkan_buffer_t obj_uni_buffer;
-	vulkan_material_shader_state_t instance_states[VULKAN_MATERIAL_MAX_COUNT];
-
-	VkDescriptorSetLayout global_desc_set_layout;
-	VkDescriptorPool global_desc_pool;
-	VkDescriptorSet global_desc_sets[4]; // TODO: using dynamic array
-
-	VkDescriptorSetLayout obj_desc_set_layout;
-	VkDescriptorPool obj_desc_pool;
-
-	vulkan_material_shader_global_ubo_t global_ubo;
-	texture_use_t sampler_uses[VULKAN_MATERIAL_SHADER_SAMPLER_COUNT];	
-
-	uint32_t obj_uniform_buffer_idx;
-	b8 desc_updated[4]; // TODO: using dynamic array
-} vulkan_material_shader_t;
+	vulkan_buffer_t uniform_buffer;
+	uint32_t instance_count;
+	vulkan_shader_instance_state_t instance_states[VULKAN_MATERIAL_MAX_COUNT];
+	b8 desc_updated[4]; // IDK if this needed.
+	void *map_uni_buffer_block;
+} vulkan_shader_t;
 
 /* ========================== Vulkan Geometry =============================== */
 #define VULKAN_GEOMETRY_MAX_COUNT 4096
@@ -251,9 +222,6 @@ typedef struct vulkan_context_t {
 
 	vulkan_buffer_t obj_vert_buffer;
 	vulkan_buffer_t obj_idx_buffer;
-
-	vulkan_material_shader_t material_shader;
-	vulkan_ui_shader_t ui_shader;
 
 	vulkan_geo_data_t geometries[VULKAN_GEOMETRY_MAX_COUNT];
 

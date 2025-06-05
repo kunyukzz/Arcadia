@@ -10,6 +10,7 @@ b8   vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
                       VkDescriptorSetLayout             *set_layout,
                       VkPipelineShaderStageCreateInfo *stg, VkViewport viewport,
                       VkRect2D scissor, b8 is_wireframe, b8 depth_enable,
+                      uint32_t push_const_range_count, range *push_const_range,
                       vulkan_pipeline_t *pipeline);
 
 void vk_pipeline_shut(vulkan_context_t *ctx, vulkan_pipeline_t *pipeline);

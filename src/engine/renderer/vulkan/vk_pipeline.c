@@ -2,20 +2,20 @@
 
 #include "engine/core/logger.h"
 #include "engine/memory/memory.h"
-#include "engine/math/math_type.h"
 #include "engine/renderer/vulkan/vk_result.h"
 
-b8   vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
-                      uint32_t attr_count, uint32_t stride,
-                      uint32_t set_layout_count, uint32_t stg_count,
-                      VkVertexInputAttributeDescription *attr,
-                      VkDescriptorSetLayout             *set_layout,
-                      VkPipelineShaderStageCreateInfo *stg, VkViewport viewport,
-                      VkRect2D scissor, b8 is_wireframe, b8 depth_enable,
-                      vulkan_pipeline_t *pipeline) {
+b8 vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
+                    uint32_t attr_count, uint32_t stride,
+                    uint32_t set_layout_count, uint32_t stg_count,
+                    VkVertexInputAttributeDescription *attr,
+                    VkDescriptorSetLayout             *set_layout,
+                    VkPipelineShaderStageCreateInfo *stg, VkViewport viewport,
+                    VkRect2D scissor, b8 is_wireframe, b8 depth_enable,
+                    uint32_t push_const_range_count, range *push_const_range,
+                    vulkan_pipeline_t *pipeline) {
     (void)viewport;
-	(void)scissor;
-	/* Viewport State */
+    (void)scissor;
+    /* Viewport State */
 	VkPipelineViewportStateCreateInfo vw_info = {};
 	vw_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	vw_info.viewportCount = 1;
@@ -120,16 +120,32 @@ b8   vk_pipeline_init(vulkan_context_t *ctx, vulkan_renderpass_t *renderpass,
 	pipe_lay_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
 	/* Push Constant */
-    VkPushConstantRange push_const = {};
-    push_const.stageFlags          = VK_SHADER_STAGE_VERTEX_BIT;
-    push_const.offset              = sizeof(mat4) * 0;
-    push_const.size                = sizeof(mat4) * 2;
+	if (push_const_range_count > 0) {
+		if (push_const_range_count > 32) {
+            ar_ERROR("vk_pipeline_init - cannot have more than 32 push "
+                     "constant range. Passed count: %i",
+                     push_const_range_count);
+            return false;
+        }
+
+		VkPushConstantRange range[32];
+		memory_zero(range, sizeof(VkPushConstantRange) * 32);
+		for (uint32_t i = 0; i < push_const_range_count; ++i) {
+            range[i].stageFlags =
+                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            range[i].offset = push_const_range[i].offset;
+            range[i].size = push_const_range[i].size;
+		}
+		pipe_lay_info.pPushConstantRanges = range;
+		pipe_lay_info.pushConstantRangeCount = push_const_range_count;
+	} else {
+		pipe_lay_info.pPushConstantRanges = 0;
+		pipe_lay_info.pushConstantRangeCount = 0;
+	}
 
     /* Descriptor Layout */
 	pipe_lay_info.setLayoutCount = set_layout_count;
 	pipe_lay_info.pSetLayouts = set_layout;
-	pipe_lay_info.pushConstantRangeCount = 1;
-	pipe_lay_info.pPushConstantRanges = &push_const;
 
 	/* Create Pipeline Layout */
     VK_CHECK(vkCreatePipelineLayout(ctx->device.logic_dev, &pipe_lay_info,

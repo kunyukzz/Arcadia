@@ -5,7 +5,7 @@
 
 b8    vk_buffer_init(vulkan_context_t *ctx, uint64_t size,
                      VkBufferUsageFlagBits usage, uint32_t mem_prop_flag,
-                     b8 bind_on_create, vulkan_buffer_t *buffer);
+                     b8 bind_on_create, b8 use_freelist, vulkan_buffer_t *buffer);
 
 void  vk_buffer_shut(vulkan_context_t *ctx, vulkan_buffer_t *buffer);
 
@@ -19,6 +19,9 @@ void *vk_buffer_lock_mem(vulkan_context_t *ctx, vulkan_buffer_t *buffer,
                          uint64_t offset, uint64_t size, uint32_t flag);
 
 void  vk_buffer_unlock_mem(vulkan_context_t *ctx, vulkan_buffer_t *buffer);
+
+b8 vk_buffer_allocate(vulkan_buffer_t *buffer, uint64_t size, uint64_t *offset);
+b8 vk_buffer_free(vulkan_buffer_t *buffer, uint64_t size, uint64_t offset);
 
 void  vk_buffer_load_data(vulkan_context_t *ctx, vulkan_buffer_t *buffer,
                           uint64_t offset, uint64_t size, uint32_t flag,
