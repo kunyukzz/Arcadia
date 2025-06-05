@@ -32,7 +32,7 @@ b8 material_loader_load(resource_loader_t *self, const char *name,
 	// TODO: Should use allocator.
     material_config_t *resc_data =
         memory_alloc(sizeof(material_config_t), MEMTAG_MATERIAL);
-	resc_data->type = MATERIAL_TYPE_WORLD;
+	resc_data->shader_name = "Builtin.Material";
 	resc_data->auto_release = true;
 	resc_data->diffuse_color = vec4_one();
 	resc_data->diffuse_map_name[0] = 0;
@@ -85,11 +85,8 @@ b8 material_loader_load(resource_loader_t *self, const char *name,
 				ar_WARNING("Error parsing diffuse_color in file: '%s'", full_path);
 				resc_data->diffuse_color = vec4_one(); // set white
 			}
-		} else if (string_equali(trim_name, "type")) {
-			// TODO: other material type
-			if (string_equali(trim_value, "ui")) {
-				resc_data->type = MATERIAL_TYPE_UI;
-			}
+		} else if (string_equali(trim_name, "shader")) {
+			resc_data->shader_name = string_duplicate(trim_value);
         } else {
             ar_WARNING("Unknown field '%s' in material file: '%s'",
                        trim_name, full_path);

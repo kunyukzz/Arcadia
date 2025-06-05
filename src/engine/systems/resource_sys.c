@@ -6,6 +6,7 @@
 #include "engine/resources/binary_loader.h"
 #include "engine/resources/image_loader.h"
 #include "engine/resources/material_loader.h"
+#include "engine/resources/shader_loader.h"
 
 typedef struct resource_sys_state_t {
 	resource_sys_config_t config;
@@ -55,6 +56,7 @@ b8 resource_sys_init(uint64_t *memory_require, void *state,
 	resource_sys_reg_loader(loader_binary_rsc_init());
 	resource_sys_reg_loader(loader_image_rsc_init());
 	resource_sys_reg_loader(loader_material_rsc_init());
+	resource_sys_reg_loader(loader_shader_rsc_init());
 
     ar_INFO("Resource System Initialize. Base path: '%s'", config.base_path);
     return true;

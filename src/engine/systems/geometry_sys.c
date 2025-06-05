@@ -58,6 +58,7 @@ b8 default_geo_init(geometry_sys_state_t *state) {
 	uint32_t indices[6] = {0, 1, 2, 0, 3, 1};
 
 	/* Send geometry to renderer to be upload to GPU */
+	p_state->default_geometry.internal_id = INVALID_ID;
     if (!renderer_geometry_init(&state->default_geometry, sizeof(vertex_3d), 4,
                                 verts, sizeof(uint32_t), 6, indices)) {
         ar_FATAL("Failed to create default geometry");

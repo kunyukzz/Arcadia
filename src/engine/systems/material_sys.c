@@ -7,12 +7,33 @@
 #include "engine/renderer/renderer_fe.h"
 #include "engine/systems/texture_sys.h"
 #include "engine/systems/resource_sys.h"
+#include "engine/systems/shader_sys.h"
+
+typedef struct material_shader_uni_loc_t {
+	uint16_t projection;
+	uint16_t view;
+	uint16_t diffuse_color;
+	uint16_t diffuse_texture;
+	uint16_t model;
+} material_shader_uni_loc_t;
+
+typedef struct ui_shader_uni_loc_t {
+	uint16_t projection;
+	uint16_t view;
+	uint16_t diffuse_color;
+	uint16_t diffuse_texture;
+	uint16_t model;
+} ui_shader_uni_loc_t;
 
 typedef struct material_sys_state_t {
 	material_sys_config_t config;
 	material_t default_material;
 	material_t *reg_materials;
 	hashtable_t reg_material_table;
+	material_shader_uni_loc_t material_loc;
+	ui_shader_uni_loc_t ui_loc;
+	uint32_t material_shader_id;
+	uint32_t ui_shader_id;
 } material_sys_state_t;
 
 typedef struct material_ref_t {
@@ -40,7 +61,9 @@ b8 default_material_init(material_sys_state_t *state) {
 
 	// TODO: create renderer material initialized
 
-    if (!renderer_material_init(&state->default_material)) {
+    shader_t *s = shader_sys_get(BUILTIN_SHADER_NAME_MATERIAL);
+    if (!renderer_shader_acquire_inst_resc(s, &state->default_material
+                                                   .internal_id)) {
         ar_FATAL("Failed to acquire renderer resources for default material. "
                  "Application cannot continue.");
         return false;
@@ -55,7 +78,7 @@ b8 load_material(material_config_t config, material_t *mt) {
 	string_ncopy(mt->name, config.name, MATERIAL_NAME_MAX_LENGTH);
 
 	/* Type */
-	mt->type = config.type;
+	mt->shader_id = shader_sys_get_id(config.shader_name);
 
 	/* Diffuse Color */
 	mt->diffuse_color = config.diffuse_color;
@@ -78,7 +101,15 @@ b8 load_material(material_config_t config, material_t *mt) {
 
 	// TODO: Other maps
 
-	if (!renderer_material_init(mt)) {
+	shader_t *s = shader_sys_get(config.shader_name);
+	if (!s) {
+        ar_ERROR("Unable to load material because its shader was not found: "
+                 "'%s'. Likely problem with material asset",
+                 config.shader_name);
+        return false;
+    }
+
+	if (!renderer_shader_acquire_inst_resc(s, &mt->internal_id)) {
         ar_ERROR("Failed to acquire renderer resources for material '%s'",
                  mt->name);
         return false;
@@ -94,7 +125,10 @@ void default_material_shut(material_t *mt) {
 		texture_sys_release(mt->diffuse_map.texture->name);
 	}
 
-	renderer_material_shut(mt);
+	if (mt->shader_id != INVALID_ID && mt->internal_id != INVALID_ID) {
+		renderer_shader_release_inst_resc(shader_sys_get_by_id(mt->shader_id), mt->internal_id);
+		mt->shader_id = INVALID_ID;
+	}
 	
 	memory_zero(mt, sizeof(material_t));
 	mt->id = INVALID_ID;
@@ -122,6 +156,12 @@ b8   material_sys_init(uint64_t *memory_require, void *state,
 
 	p_state = state;
 	p_state->config = config;
+	p_state->material_shader_id = INVALID_ID;
+	p_state->material_loc.diffuse_color = INVALID_ID_U16;
+	p_state->material_loc.diffuse_texture = INVALID_ID_U16;
+	p_state->ui_shader_id = INVALID_ID;
+	p_state->ui_loc.diffuse_color = INVALID_ID_U16;
+	p_state->ui_loc.diffuse_texture = INVALID_ID_U16;
 
 	void *array_block = (char *)state + struct_req;
 	p_state->reg_materials = array_block;
@@ -236,6 +276,34 @@ material_t *material_sys_acquire_from_config(material_config_t config) {
                 return 0;
             }
 
+			shader_t *s = shader_sys_get_by_id(mm->shader_id);
+            if (p_state->material_shader_id == INVALID_ID &&
+                string_equal(config.shader_name,
+                             BUILTIN_SHADER_NAME_MATERIAL)) {
+                p_state->material_shader_id = s->id;
+                p_state->material_loc.projection =
+                    shader_sys_uniform_idx(s, "projection");
+                p_state->material_loc.view = shader_sys_uniform_idx(s, "view");
+                p_state->material_loc.diffuse_color =
+                    shader_sys_uniform_idx(s, "diffuse_color");
+                p_state->material_loc.diffuse_texture =
+                    shader_sys_uniform_idx(s, "diffuse_texture");
+                p_state->material_loc.model =
+                    shader_sys_uniform_idx(s, "model");
+            } else if (p_state->ui_shader_id == INVALID_ID &&
+                       string_equal(config.shader_name,
+                                    BUILTIN_SHADER_NAME_UI)) {
+                p_state->ui_shader_id = s->id;
+                p_state->ui_loc.projection =
+                    shader_sys_uniform_idx(s, "projection");
+                p_state->ui_loc.view = shader_sys_uniform_idx(s, "view");
+                p_state->ui_loc.diffuse_color =
+                    shader_sys_uniform_idx(s, "diffuse_color");
+                p_state->ui_loc.diffuse_texture =
+                    shader_sys_uniform_idx(s, "diffuse_texture");
+                p_state->ui_loc.model = shader_sys_uniform_idx(s, "model");
+            }
+
             if (mm->gen == INVALID_ID) {
                 mm->gen = 0;
             } else {
@@ -298,3 +366,69 @@ void material_sys_release(const char *name) {
                  name);
     }
 }
+
+#define MATERIAL_APPLY_OR_FAIL(expr)                                           \
+    if (!expr) {                                                               \
+        ar_ERROR("Failed to apply material: '%s'", expr);                      \
+        return false;                                                          \
+    }
+
+b8 material_sys_apply_global(uint32_t shader_id, const mat4 *projection,
+                             const mat4 *view) {
+    if (shader_id == p_state->material_shader_id) {
+        MATERIAL_APPLY_OR_FAIL(
+            shader_sys_uniform_set_idx(p_state->material_loc.projection,
+                                       projection));
+        MATERIAL_APPLY_OR_FAIL(
+            shader_sys_uniform_set_idx(p_state->material_loc.view, view));
+    } else if (shader_id == p_state->ui_shader_id) {
+        MATERIAL_APPLY_OR_FAIL(
+            shader_sys_uniform_set_idx(p_state->ui_loc.projection, projection));
+        MATERIAL_APPLY_OR_FAIL(
+            shader_sys_uniform_set_idx(p_state->ui_loc.view, view));
+    } else {
+        ar_ERROR("material_sys_apply_global - Unrecognized shader id ''%d",
+                 shader_id);
+        return false;
+    }
+    MATERIAL_APPLY_OR_FAIL(shader_sys_apply_global());
+    return true;
+}
+
+b8 material_sys_apply_instance(material_t *material) {
+    MATERIAL_APPLY_OR_FAIL(shader_sys_bind_instance(material->internal_id));
+    if (material->shader_id == p_state->material_shader_id) {
+        MATERIAL_APPLY_OR_FAIL(
+            shader_sys_uniform_set_idx(p_state->material_loc.diffuse_color,
+                                       &material->diffuse_color));
+        MATERIAL_APPLY_OR_FAIL(
+            shader_sys_uniform_set_idx(p_state->material_loc.diffuse_texture,
+                                       &material->diffuse_map.texture));
+    } else if (material->shader_id == p_state->ui_shader_id) {
+        MATERIAL_APPLY_OR_FAIL(
+            shader_sys_uniform_set_idx(p_state->ui_loc.diffuse_color,
+                                       &material->diffuse_color));
+        MATERIAL_APPLY_OR_FAIL(
+            shader_sys_uniform_set_idx(p_state->ui_loc.diffuse_texture,
+                                       &material->diffuse_map.texture));
+    } else {
+        ar_ERROR("material_sys_apply_instance - Unrecognized shader id '%d' on "
+                 "shader '%s'",
+                 material->shader_id, material->name);
+        return false;
+    }
+    MATERIAL_APPLY_OR_FAIL(shader_sys_apply_instance());
+    return true;
+}
+
+b8 material_sys_apply_local(material_t *material, const mat4 *model) {
+	if (material->shader_id == p_state->material_shader_id) {
+		return shader_sys_uniform_set_idx(p_state->material_loc.model, model);
+	} else if (material->shader_id == p_state->ui_shader_id) {
+		return shader_sys_uniform_set_idx(p_state->ui_loc.model, model);
+	}
+
+	ar_ERROR("Unrecognized shader id '%d'", material->shader_id);
+	return false;
+}
+
