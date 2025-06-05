@@ -5,6 +5,12 @@
 #include "engine/math/math_type.h"
 #include "engine/resources/resc_type.h"
 
+#define BUILTIN_SHADER_NAME_MATERIAL "Builtin.MaterialShader"
+#define BUILTIN_SHADER_NAME_UI "Builtin.UIShader"
+
+struct shader_t;
+struct shader_uniform_t;
+
 typedef enum render_backend_type_t {
 	BACKEND_OPENGL,
 	BACKEND_VULKAN
@@ -32,10 +38,6 @@ typedef struct render_backend_t {
     b8 (*begin_frame)(struct render_backend_t *backend, float delta_time);
     b8 (*end_frame)(struct render_backend_t *backend, float delta_time);
 
-    void (*update_world)(mat4 projection, mat4 viewx, vec3 view_pos,
-                          vec4 ambient_color, int32_t mode);
-    void (*update_ui)(mat4 projection, mat4 viewx, int32_t mode);
-
 	b8 (*begin_renderpass)(struct render_backend_t *backend, uint8_t renderpass_id);
 	b8 (*end_renderpass)(struct render_backend_t *backend, uint8_t renderpass_id);
 
@@ -54,6 +56,21 @@ typedef struct render_backend_t {
 
     void (*shut_geo)(geometry_t *geometry);
 
+    b8 (*create_shader)(struct shader_t *shader, uint8_t renderpass_id,
+                      uint8_t stage_count, const char **stage_filenames,
+                      shader_stage_t *stages);
+
+	void (*shut_shader)(struct shader_t *shader);
+
+	b8 (*init_shader)(struct shader_t *shader);
+	b8 (*use_shader)(struct shader_t *shader);
+	b8 (*bind_shader_global)(struct shader_t *shader);
+	b8 (*bind_shader_instance)(struct shader_t *shader, uint32_t instance_id);
+	b8 (*apply_shader_global)(struct shader_t *shader);
+	b8 (*apply_shader_instance)(struct shader_t *shader);
+	b8 (*acquire_shader_inst_resc)(struct shader_t *shader, uint32_t *instance_id);
+	b8 (*release_shader_inst_resc)(struct shader_t *shader, uint32_t instance_id);
+	b8 (*set_uniform_shader)(struct shader_t *fe_shader, struct shader_uniform_t *uniform, const void *value);
 } render_backend_t;
 
 typedef struct render_packet_t {

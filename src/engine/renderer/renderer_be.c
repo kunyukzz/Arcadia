@@ -1,6 +1,7 @@
 #include "engine/renderer/renderer_be.h"
 #include "engine/renderer/vulkan/vk_backend.h"
 #include "engine/core/logger.h"
+#include "engine/memory/memory.h"
 
 b8 renderer_be_init(render_backend_type_t type, render_backend_t *backend) {
 	if (type == BACKEND_OPENGL) {
@@ -14,21 +15,28 @@ b8 renderer_be_init(render_backend_type_t type, render_backend_t *backend) {
 		backend->resize = vk_backend_resize;
 		backend->shut = vk_backend_shut;
 
-		backend->update_world = vk_backend_update_world;
-		backend->update_ui = vk_backend_update_ui;
-
 		backend->begin_renderpass = vk_backend_begin_renderpass;
 		backend->end_renderpass = vk_backend_end_renderpass;
 
 		backend->init_tex = vk_backend_tex_init;
 		backend->shut_tex = vk_backend_tex_shut;
 
-		backend->init_material = vk_backend_material_init;
-		backend->shut_material = vk_backend_material_shut;
-
 		backend->draw_geometry = vk_backend_geo_render;
 		backend->init_geo = vk_backend_geometry_init;
 		backend->shut_geo = vk_backend_geometry_shut;
+
+		backend->create_shader = vk_backend_shader_create;
+		backend->shut_shader = vk_backend_shader_shut;
+		backend->set_uniform_shader = vk_backend_set_uniform;
+		backend->init_shader = vk_backend_shader_init;
+		backend->use_shader = vk_backend_shader_use;
+		backend->bind_shader_global = vk_backend_shader_bind_globals;
+		backend->bind_shader_instance = vk_backend_shader_bind_instance;
+		backend->apply_shader_global = vk_backend_shader_apply_globals;
+		backend->apply_shader_instance = vk_backend_shader_apply_instance;
+		backend->acquire_shader_inst_resc = vk_backend_shader_acquire_inst_resc;
+		backend->release_shader_inst_resc = vk_backend_shader_release_inst_resc;
+
 		return true;
 	}
 	return false;
@@ -40,25 +48,5 @@ void renderer_be_shut(render_backend_t *backend) {
         return;
     }
 
-	backend->init = 0;
-	backend->begin_frame = 0;
-	backend->end_frame = 0;
-	backend->resize = 0;
-	backend->shut = 0;
-
-	backend->update_world = 0;
-	backend->update_ui = 0;
-
-	backend->begin_renderpass = 0;
-	backend->end_renderpass = 0;
-
-	backend->init_tex = 0;
-	backend->shut_tex = 0;
-
-	backend->init_material = 0;
-	backend->shut_material = 0;
-
-	backend->draw_geometry = 0;
-	backend->init_geo = 0;
-	backend->shut_geo = 0;
+	memory_zero(backend, sizeof(render_backend_t));
 }
